@@ -1,0 +1,7 @@
+{
+  "id": 1,
+  "username": "john_doe",
+  "email": "johndoe@example.com",
+  "name": "John Doe",
+  "avatar_url": "https://example.com/avatar.jpg"
+}
