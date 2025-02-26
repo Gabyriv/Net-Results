@@ -1,14 +1,33 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
     try {
         // Create a Supabase client configured to use cookies
-        const supabase = createMiddlewareClient({ req: request, res: NextResponse.next() })
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) {
+                        return request.cookies.get(name)?.value
+                    },
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    set(_name: string, _value: string, _options: Record<string, unknown>) {
+                        // This is used for setting cookies in the browser during SSR
+                        // We don't need this in middleware as we're just reading cookies
+                    },
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    remove(_name: string, _options: Record<string, unknown>) {
+                        // Same as above, not needed in middleware
+                    },
+                },
+            }
+        )
         
         // Refresh session if expired - required for Server Components
-        const { data: { session }, error } = await supabase.auth.getSession()
+        const { data: { session } } = await supabase.auth.getSession()
 
         // If there's no session and the path is protected, redirect to login
         const isAuthRoute = request.nextUrl.pathname.startsWith('/api/auth')
@@ -38,8 +57,8 @@ export async function middleware(request: NextRequest) {
 
         // Continue with the request
         return NextResponse.next()
-    } catch (error) {
-        console.error('Auth middleware error:', error)
+    } catch (_error: unknown) {
+        console.error('Auth middleware error:', _error)
         return NextResponse.json(
             { error: 'Internal Server Error' },
             { status: 500 }

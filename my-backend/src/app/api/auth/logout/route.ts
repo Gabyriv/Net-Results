@@ -27,7 +27,7 @@ import { handleServerError } from "@/app/api/errors_handlers/errors";
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export async function POST(request: Request) {
+export async function POST() {
     try {
         const { error: authError } = await supabase.auth.signOut();
 

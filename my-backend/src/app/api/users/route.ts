@@ -5,7 +5,7 @@ import { handleServerError } from "@/app/api/errors_handlers/errors";
 import { UserSchema } from "../types/types";
 import supabase from "@/config/supabase_client";
 import { withAuth } from "@/utils/auth-utils";
-
+import type { Session } from '@supabase/supabase-js';
 
 /**
  * @swagger
@@ -112,50 +112,117 @@ export async function POST(request: Request) {
         const body = await request.json();
         const validated = UserSchema.parse(body);
 
-        // Force new registrations to be USER role
-        const userRole = 'USER';
+        // Force new registrations to be ADMIN role
+        const userRole = 'ADMIN';
 
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: validated.email,
-            password: validated.password,
-            options: {
-                data: {
-                    name: validated.name,
-                    role: userRole
+        try {
+            console.log('Attempting to sign up user with email:', validated.email);
+            
+            // First check if the user already exists in Prisma
+            const existingUser = await prisma.user.findUnique({
+                where: { email: validated.email }
+            });
+            
+            if (existingUser) {
+                return NextResponse.json(
+                    { error: 'Email already exists' },
+                    { status: 409 }
+                );
+            }
+            
+            // Then try to create the user in Supabase
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: validated.email,
+                password: validated.password,
+                options: {
+                    data: {
+                        name: validated.name,
+                        role: userRole
+                    }
+                }
+            });
+
+            if (authError) {
+                console.error('Supabase auth error:', authError);
+                return handleServerError(authError);
+            }
+
+            if (!authData.user) {
+                console.error('No user returned from Supabase');
+                return NextResponse.json(
+                    { error: 'Failed to create authentication user' },
+                    { status: 500 }
+                );
+            }
+        
+            // Check if the user needs to confirm their email
+            if (authData.user && !authData.session) {
+                // This means the user was created but needs to confirm their email
+                console.log('User created in Supabase, awaiting email confirmation');
+                
+                // We can still create the user in our database
+                const hashedPassword = await bcrypt.hash(validated.password, 12);
+                
+                try {
+                    const user = await prisma.user.create({
+                        data: {
+                            id: authData.user.id,
+                            name: validated.name,
+                            email: validated.email,
+                            password: hashedPassword,
+                            role: userRole
+                        },
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true
+                        }
+                    });
+                    
+                    return NextResponse.json({ 
+                        success: true, 
+                        data: user,
+                        message: 'User created. Please check your email to confirm your account.'
+                    }, { status: 201 });
+                } catch (prismaError) {
+                    console.error('Error creating user in Prisma:', prismaError);
+                    
+                    // Try to delete the user from Supabase since we couldn't create in Prisma
+                    try {
+                        await supabase.auth.admin.deleteUser(authData.user.id);
+                    } catch (deleteError) {
+                        console.error('Failed to delete user from Supabase after Prisma error:', deleteError);
+                    }
+                    
+                    return handleServerError(prismaError);
                 }
             }
-        })
-
-        if (authError) {
-            return handleServerError(authError);
-        }
-
-        if (!authData.user) {
-            return NextResponse.json(
-                { error: 'Failed to create authentication user' },
-                { status: 500 }
-            );
-        }
+            
+            // If we have a session, the user was created and automatically signed in
+            const hashedPassword = await bcrypt.hash(validated.password, 12);
         
-        const hashedPassword = await bcrypt.hash(validated.password, 12);
-        
-        const user = await prisma.user.create({
-            data: {
-                id: authData.user.id,
-                name: validated.name,
-                email: validated.email,
-                password: hashedPassword,
-                role: userRole
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true
-            }
-        })
+            const user = await prisma.user.create({
+                data: {
+                    id: authData.user.id,
+                    name: validated.name,
+                    email: validated.email,
+                    password: hashedPassword,
+                    role: userRole
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                }
+            })
 
-        return NextResponse.json({ success: true, data: user }, { status: 201 })
+            return NextResponse.json({ success: true, data: user }, { status: 201 })
+        } catch (error) {
+            console.error('Error creating user:', error);
+            return handleServerError(error);
+        }
     } catch (error) {
         return handleServerError(error)
     }
@@ -192,7 +259,7 @@ export async function POST(request: Request) {
  */
 export async function GET() {
     // Only admins can list all users
-    return withAuth(async (session) => {
+    return withAuth(async (session: Session) => {
         try {
             if (session.user.role !== 'ADMIN') {
                 return NextResponse.json(
@@ -222,5 +289,4 @@ export async function GET() {
             return handleServerError(error);
         }
     }, 'ADMIN');
-}
 }

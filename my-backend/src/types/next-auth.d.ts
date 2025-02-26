@@ -1,11 +1,11 @@
-import { DefaultSession } from '@supabase/auth-helpers-nextjs'
+import type { Session as SupabaseSession } from '@supabase/supabase-js'
 
-declare module '@supabase/auth-helpers-nextjs' {
-    interface Session extends DefaultSession {
+declare module '@supabase/supabase-js' {
+    interface Session extends SupabaseSession {
         user: {
             id: string
             email: string
             role: 'ADMIN' | 'USER'
-        } & DefaultSession['user']
+        } & SupabaseSession['user']
     }
 }
