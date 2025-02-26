@@ -1,10 +1,10 @@
 <template>
   <DashboardLayout>
     <div class="container mx-auto p-4">
-      <h1 class="text-3xl font-bold mb-4">Matches</h1>
-      <!-- Add your matches content here -->
+      <h1 class="text-3xl font-bold mb-4">Statistics</h1>
+      <!-- Add your statistics content here -->
       <div>
-        <p>List of matches will be displayed here.</p>
+        <p>Statistics will be displayed here.</p>
       </div>
     </div>
   </DashboardLayout>
@@ -14,7 +14,7 @@
 import DashboardLayout from '../layouts/DashboardLayout.vue'
 
 export default {
-  name: 'Matches',
+  name: 'Statistics',
   components: {
     DashboardLayout,
   },
