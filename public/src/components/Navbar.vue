@@ -1,15 +1,15 @@
 <template>
-    <nav class="bg-blue-600 p-4 text-white flex justify-between">
-      <div class="font-bold">Volleyball Stats</div>
+    <nav class="bg-blue-500 p-4 text-white flex justify-between">
+      <div class="font-bold">Welcome to the Volleyball Stats App</div>
       <ul class="flex space-x-4">
         <li>
-          <router-link to="/">Home</router-link>
+          <router-link to="/login" class="text-white">Login</router-link>
         </li>
         <li>
           <router-link to="/dashboard">Dashboard</router-link>
         </li>
         <li>
-          <router-link to="/players">Players</router-link>
+          <router-link to="/players">Teams</router-link>
         </li>
       </ul>
     </nav>

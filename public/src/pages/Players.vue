@@ -1,7 +1,7 @@
 <template>
   <DefaultLayout>
     <div class="container mx-auto p-4">
-      <h1 class="text-3xl font-bold mb-4">Players</h1>
+      <h1 class="text-3xl font-bold mb-4">Teams</h1>
 
       <!-- Error Message Section -->
       <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
@@ -27,7 +27,7 @@ import DefaultLayout from "../layouts/DefaultLayout.vue"
 import LoadingSpinner from "../components/LoadingSpinner.vue"
 
 export default {
-  name: "Players",
+  name: "Teams",
   components: { DefaultLayout, LoadingSpinner },
   setup() {
     const { players, error, loading, fetchPlayers } = usePlayers()

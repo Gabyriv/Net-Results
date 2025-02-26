@@ -2,14 +2,15 @@
 <template>
   <DefaultLayout>
     <div class="container mx-auto p-4">
-      <h1 class="text-3xl font-bold mb-4">Welcome to the Volleyball Stats App</h1>
+    <div class="relative w-full h-screen banner-container overflow-hidden mb-4 shadow-lg bg-gray-800">
+      <img src="/banner.jpeg" alt="Banner" class="w-full h-full object-cover" />
+    <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-5">
+      <h1 class="text-7xl font-bold text-white">Volleyball Stats App</h1>
       <p class="text-lg">Track your team's performance and analyze match statistics.</p>
-      <nav class="bg-gray-800 p-4">
-    <div class="container mx-auto flex justify-between">
-      <router-link to="/" class="text-white">Home</router-link>
-      <router-link to="/login" class="text-white">Login</router-link>
     </div>
-  </nav>
+    </div>
+    <div class="flex justify-between">
+    </div>
     </div>
   </DefaultLayout>
 </template>
@@ -24,3 +25,11 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* You can add custom styles if needed here */
+.banner-container {
+  width: 100%;
+  height: auto;
+}
+</style>
