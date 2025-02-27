@@ -1,14 +1,25 @@
 import { prisma } from "@/lib/prisma";
+import { createClient } from "@/utils/supabase/server";
+import { randomUUID } from "crypto";
 
-interface CreateManagerInput {
-    id: any;
-    user: any;
-    displayName: string;
+export async function createManagerAction(form: FormData) {
+    const supabase = await createClient();
 
-}
-
-export async function createManagerAction(input: CreateManagerInput) {
     try {
+        console.log('Creating manager...');
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        const displayName = form.get('name');
+        console.log('Display name:', displayName);
+
+        if (!displayName || typeof displayName !== 'string') {
+            throw new Error('Name is required and must be a string');
+        }
+
         const newManager = await prisma.manager.create({
             data: {
                 id: input.id,
@@ -16,6 +27,8 @@ export async function createManagerAction(input: CreateManagerInput) {
                 displayName: input.displayName,
             },
         });
+
+        console.log('Manager created:', newManager);
         return newManager;
     } catch (error) {
         console.error('Error creating manager:', error);
