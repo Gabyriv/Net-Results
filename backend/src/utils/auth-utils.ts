@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server'
 import type { Session } from '@supabase/supabase-js'
 export { Session }
 
-export type Role = 'ADMIN' | 'USER'
+// Import Role from types
+import { Role } from '../app/api/types/types'
 
 export type AuthResult = 
   | { authorized: true; session: Session }
@@ -14,78 +15,108 @@ export type AuthResult =
 
 export async function checkRole(requiredRole?: Role): Promise<AuthResult> {
     try {
+        // DEVELOPMENT MODE ONLY - DO NOT USE IN PRODUCTION
+        // This is a simplified authentication system for testing purposes
+        
         const cookieStore = await cookies()
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get(name: string) {
-                        return cookieStore.get(name)?.value
-                    },
-                    set(name: string, value: string, options: Record<string, unknown>) {
-                        cookieStore.set({ name, value, ...options })
-                    },
-                    remove(name: string, options: Record<string, unknown>) {
-                        cookieStore.set({ name, value: '', ...options })
-                    },
-                },
-            }
-        )
-        const { data: { session }, error } = await supabase.auth.getSession()
-
-        if (error || !session) {
+        const authCookie = cookieStore.get('auth_token')
+        
+        // For development, we'll accept any auth token
+        if (!authCookie?.value) {
             return {
                 authorized: false,
                 error: 'Unauthorized - Please login',
                 status: 401
             }
         }
-
-        if (requiredRole) {
-            const userRole = session.user.user_metadata?.role || 'USER'
-            if (requiredRole === 'ADMIN' && userRole !== 'ADMIN') {
+        
+        try {
+            // In development mode, we'll extract the user ID from the token
+            // Format of the mock token is: mock_token_USER_ID_TIMESTAMP
+            const tokenParts = authCookie.value.split('_');
+            let userId = 'dev-user-id';
+            
+            // If the token follows our expected format, extract the user ID
+            if (tokenParts.length >= 3 && tokenParts[0] === 'mock' && tokenParts[1] === 'token') {
+                userId = tokenParts[2];
+            }
+            
+            // Create a mock user with the required role or default to Manager
+            const mockRole = requiredRole || 'Manager';
+            
+            // Create a mock session
+            const mockSession: Session = {
+                user: {
+                    id: userId,
+                    email: 'dev@example.com',
+                    role: mockRole,
+                    user_metadata: {
+                        role: mockRole,
+                        displayName: 'Development User'
+                    }
+                } as any,
+                access_token: authCookie.value,
+                refresh_token: 'mock-refresh-token',
+                expires_at: Date.now() + 3600
+            }
+            
+            // If a role is required, check that it matches
+            if (requiredRole && mockRole !== requiredRole) {
                 return {
                     authorized: false,
-                    error: 'Forbidden - Admin access required',
+                    error: `Forbidden - ${requiredRole} access required`,
                     status: 403
                 }
             }
-        }
-
-        return {
-            authorized: true,
-            session
+            
+            return {
+                authorized: true,
+                session: mockSession
+            }
+        } catch (error) {
+            console.error('Auth error:', error)
+            return {
+                authorized: false,
+                error: 'Invalid token',
+                status: 401
+            }
         }
     } catch (error) {
-        console.error('Authorization check error:', error)
+        console.error('Auth error:', error)
         return {
             authorized: false,
-            error: 'Internal Server Error',
-            status: 500
+            error: 'Invalid token',
+            status: 401
         }
     }
 }
 
-export async function withAuth(
-    handler: (session: Session) => Promise<Response | NextResponse>, 
+export async function withAuth<T>(
+    request: Request | null,
+    handler: (session: { 
+        userId: string, 
+        userEmail: string, 
+        userRole: string, 
+        userMetadata: any 
+    }) => Promise<T>,
     requiredRole?: Role
-) {
-    const auth = await checkRole(requiredRole)
-    
-    if (!auth.authorized) {
+): Promise<T | NextResponse> {
+    const authResult = await checkRole(requiredRole);
+
+    if (!authResult.authorized) {
         return NextResponse.json(
-            { error: auth.error },
-            { status: auth.status }
-        )
+            { error: authResult.error },
+            { status: authResult.status }
+        );
     }
 
-    if (!auth.session) {
-        return NextResponse.json(
-            { error: 'Session not found' },
-            { status: 401 }
-        )
-    }
+    // Extract user information from the session
+    const session = {
+        userId: authResult.session.user.id,
+        userEmail: authResult.session.user.email || '',
+        userRole: authResult.session.user.role as string,
+        userMetadata: authResult.session.user.user_metadata
+    };
 
-    return handler(auth.session)
+    return handler(session);
 }

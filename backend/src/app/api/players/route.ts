@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import prisma from "@/config/prisma";
-import { handleServerError } from "@/app/api/errors_handlers/errors";
+import { prisma } from "../../../config/prisma";
+import { handleServerError } from "../errors_handlers/errors";
 import { PlayerSchema } from "../types/types";
-import { withAuth } from "@/utils/auth-utils";
+import { withAuth } from "../../../utils/auth-utils";
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * @swagger
@@ -21,21 +22,22 @@ import { withAuth } from "@/utils/auth-utils";
  *           schema:
  *             type: object
  *             required:
- *               - name
- *               - number
+ *               - displayName
  *               - teamId
  *             properties:
- *               name:
+ *               displayName:
  *                 type: string
  *                 minLength: 2
  *                 maxLength: 50
- *               number:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 99
  *               teamId:
  *                 type: string
  *                 format: uuid
+ *               userId:
+ *                 type: string
+ *                 format: uuid
+ *               gamesPlayed:
+ *                 type: integer
+ *                 minimum: 0
  *     responses:
  *       201:
  *         description: Player created successfully
@@ -44,69 +46,110 @@ import { withAuth } from "@/utils/auth-utils";
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden - Not team owner or admin
+ *         description: Forbidden - Manager access required
  *       404:
  *         description: Team not found
  */
 export async function POST(request: Request) {
-    return withAuth(async (session) => {
+    console.log('POST /api/players - Starting request');
+    
+    return withAuth(request, async (session) => {
+        console.log('POST /api/players - Authenticated with session:', JSON.stringify(session));
+        
+        // Check if user has Manager role
+        if (session.userRole !== 'Manager') {
+            console.log('POST /api/players - Access denied: User role is not Manager');
+            return NextResponse.json({ 
+                error: 'Forbidden', 
+                message: 'Only managers can create players' 
+            }, { status: 403 });
+        }
+        
         try {
             const body = await request.json();
-            const validated = PlayerSchema.parse(body);
-
-            // Check if team exists and user has permission
+            console.log('POST /api/players - Request body:', JSON.stringify(body));
+            
+            // Validate the request body
+            const validated = PlayerSchema.safeParse(body);
+            if (!validated.success) {
+                return NextResponse.json({ 
+                    error: 'Invalid input', 
+                    details: validated.error.format() 
+                }, { status: 400 });
+            }
+            
+            // Check if the team exists
             const team = await prisma.team.findUnique({
-                where: { id: validated.teamId },
-                select: { createdById: true }
+                where: { id: validated.data.teamId }
             });
-
+            
             if (!team) {
-                return NextResponse.json(
-                    { error: 'Team not found' },
-                    { status: 404 }
-                );
+                return NextResponse.json({ 
+                    error: 'Team not found', 
+                    message: `No team found with ID: ${validated.data.teamId}` 
+                }, { status: 404 });
             }
-
-            // Only team creator or admin can add players
-            if (team.createdById !== session.user.id && session.user.role !== 'ADMIN') {
-                return NextResponse.json(
-                    { error: 'You do not have permission to add players to this team' },
-                    { status: 403 }
-                );
-            }
-
-            // Check if player number is already taken in the team
-            const existingPlayer = await prisma.player.findFirst({
-                where: {
-                    teamId: validated.teamId,
-                    number: validated.number
+            
+            // Create the player
+            const playerData: any = {
+                id: uuidv4(), // Generate a UUID for the player ID
+                displayName: validated.data.displayName,
+                gamesPlayed: validated.data.gamesPlayed || 0,
+                team: {
+                    connect: { id: validated.data.teamId }
                 }
-            });
-
-            if (existingPlayer) {
-                return NextResponse.json(
-                    { error: 'Player number is already taken in this team' },
-                    { status: 400 }
-                );
+            };
+            
+            // If userId is provided, connect to existing user
+            if (validated.data.userId) {
+                playerData.user = {
+                    connect: { id: validated.data.userId }
+                };
+            } else {
+                // Create a new user for this player
+                const newUserId = uuidv4();
+                playerData.user = {
+                    create: {
+                        id: newUserId,
+                        email: `player-${newUserId.substring(0, 8)}@example.com`,
+                        password: "defaultPassword", // This should be hashed in production
+                        displayName: validated.data.displayName,
+                        role: "Player"
+                    }
+                };
             }
-
+            
+            console.log('Creating player with data:', JSON.stringify(playerData, null, 2));
+            
             const player = await prisma.player.create({
-                data: validated,
+                data: playerData,
                 include: {
                     team: {
                         select: {
                             id: true,
                             name: true
                         }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            displayName: true,
+                            role: true
+                        }
                     }
                 }
             });
-
+            
             return NextResponse.json({ success: true, data: player }, { status: 201 });
-        } catch (error) {
-            return handleServerError(error);
+        } catch (dbError) {
+            console.error('Database error creating player:', dbError);
+            return NextResponse.json({ 
+                error: 'Database error', 
+                message: dbError instanceof Error ? dbError.message : String(dbError)
+            }, { status: 500 });
         }
-    });
+    }, 'Manager'); // Explicitly require Manager role
 }
 
 /**
@@ -114,50 +157,57 @@ export async function POST(request: Request) {
  * /api/players:
  *   get:
  *     summary: Get all players
- *     description: Retrieves a list of all players, optionally filtered by team
+ *     description: Retrieves a list of all players
  *     tags:
  *       - Players
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: teamId
- *         schema:
- *           type: string
- *         description: Optional team ID to filter players
  *     responses:
  *       200:
  *         description: List of players retrieved successfully
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Manager access required
  */
 export async function GET(request: Request) {
-    return withAuth(async () => {
+    console.log('GET /api/players - Starting request');
+    
+    return withAuth(request, async (session) => {
+        console.log('GET /api/players - Authenticated with session:', JSON.stringify(session));
+        
+        // Check if user has Manager role
+        if (session.userRole !== 'Manager') {
+            console.log('GET /api/players - Access denied: User role is not Manager');
+            return NextResponse.json({ 
+                error: 'Forbidden', 
+                message: 'Only managers can access the list of all players' 
+            }, { status: 403 });
+        }
+        
         try {
-            const { searchParams } = new URL(request.url);
-            const teamId = searchParams.get('teamId');
-
-            const where = teamId ? { teamId } : {};
-
             const players = await prisma.player.findMany({
-                where,
                 include: {
                     team: {
                         select: {
                             id: true,
                             name: true
                         }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            displayName: true,
+                            role: true
+                        }
                     }
-                },
-                orderBy: [
-                    { teamId: 'asc' },
-                    { number: 'asc' }
-                ]
+                }
             });
-
-            return NextResponse.json({ success: true, data: players }, { status: 200 });
+            
+            return NextResponse.json({ success: true, data: players });
         } catch (error) {
             return handleServerError(error);
         }
-    });
+    }, 'Manager'); // Explicitly require Manager role
 }

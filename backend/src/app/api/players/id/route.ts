@@ -26,12 +26,26 @@ import { withAuth } from "@/utils/auth-utils";
  *         description: Player details retrieved successfully
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Not team owner, player, or admin
  *       404:
  *         description: Player not found
  */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-    return withAuth(async () => {
+    console.log('GET /api/players/id - Starting request for ID:', params.id);
+    
+    return withAuth(request, async (session) => {
+        console.log('GET /api/players/id - Authenticated with session:', JSON.stringify(session));
+        
         try {
+            // Validate the ID parameter
+            if (!params.id || typeof params.id !== 'string') {
+                return NextResponse.json(
+                    { error: 'Invalid player ID' },
+                    { status: 400 }
+                );
+            }
+            
             const player = await prisma.player.findUnique({
                 where: { id: params.id },
                 include: {
@@ -39,7 +53,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
                         select: {
                             id: true,
                             name: true,
-                            createdById: true
+                            managerId: true
+                        }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            displayName: true,
+                            role: true
                         }
                     }
                 }
@@ -49,6 +71,23 @@ export async function GET(request: Request, { params }: { params: { id: string }
                 return NextResponse.json(
                     { error: 'Player not found' },
                     { status: 404 }
+                );
+            }
+
+            // Check if user has permission to view this player
+            // Allow if:
+            // 1. User is a Manager
+            // 2. User is the team manager
+            // 3. User is the player (user.id matches player.userId)
+            const isManager = session.userRole === 'Manager';
+            const isTeamManager = player.team.managerId === session.userId;
+            const isPlayer = player.userId === session.userId;
+
+            if (!isManager && !isTeamManager && !isPlayer) {
+                console.log('GET /api/players/id - Access denied: Not manager, team manager, or the player');
+                return NextResponse.json(
+                    { error: 'You do not have permission to view this player' },
+                    { status: 403 }
                 );
             }
 
@@ -109,9 +148,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
     return withAuth(async (session) => {
         try {
-            const body = await request.json();
-            const validated = PlayerUpdateSchema.parse(body);
-
+            // Validate the ID parameter
+            if (!params.id || typeof params.id !== 'string') {
+                return NextResponse.json(
+                    { error: 'Invalid player ID' },
+                    { status: 400 }
+                );
+            }
+            
             // Get current player and team info
             const currentPlayer = await prisma.player.findUnique({
                 where: { id: params.id },
@@ -133,39 +177,72 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             }
 
             // Check permissions
-            if (currentPlayer.team.createdById !== session.user.id && session.user.role !== 'ADMIN') {
+            // Allow if:
+            // 1. User is a Manager
+            // 2. User is the team creator
+            const isManager = session.user.role === 'Manager';
+            const isTeamCreator = currentPlayer.team.createdById === session.user.id;
+            
+            if (!isManager && !isTeamCreator) {
                 return NextResponse.json(
                     { error: 'You do not have permission to update this player' },
                     { status: 403 }
                 );
             }
 
-            // If number is being changed, check if it's available
-            if (validated.number && validated.number !== currentPlayer.number) {
-                const existingPlayer = await prisma.player.findFirst({
-                    where: {
-                        teamId: currentPlayer.teamId,
-                        number: validated.number,
-                        id: { not: params.id }
-                    }
+            const body = await request.json();
+            const validated = PlayerUpdateSchema.safeParse(body);
+            
+            if (!validated.success) {
+                return NextResponse.json(
+                    { error: 'Invalid data format', details: validated.error.format() },
+                    { status: 400 }
+                );
+            }
+
+            // If changing teams, verify the new team exists and user has permission
+            if (validated.data.teamId && validated.data.teamId !== currentPlayer.teamId) {
+                const newTeam = await prisma.team.findUnique({
+                    where: { id: validated.data.teamId },
+                    select: { createdById: true }
                 });
 
-                if (existingPlayer) {
+                if (!newTeam) {
                     return NextResponse.json(
-                        { error: 'Player number is already taken in this team' },
-                        { status: 400 }
+                        { error: 'New team not found' },
+                        { status: 404 }
+                    );
+                }
+
+                // Only allow if user is Manager or creator of both teams
+                if (!isManager && newTeam.createdById !== session.user.id) {
+                    return NextResponse.json(
+                        { error: 'You do not have permission to move this player to the specified team' },
+                        { status: 403 }
                     );
                 }
             }
 
             const player = await prisma.player.update({
                 where: { id: params.id },
-                data: validated,
+                data: {
+                    ...(validated.data.displayName && { displayName: validated.data.displayName }),
+                    ...(validated.data.gamesPlayed !== undefined && { gamesPlayed: validated.data.gamesPlayed }),
+                    ...(validated.data.teamId && { teamId: validated.data.teamId })
+                },
                 include: {
                     team: {
                         select: {
                             id: true,
                             name: true
+                        }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            displayName: true,
+                            role: true
                         }
                     }
                 }
@@ -208,6 +285,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
     return withAuth(async (session) => {
         try {
+            // Validate the ID parameter
+            if (!params.id || typeof params.id !== 'string') {
+                return NextResponse.json(
+                    { error: 'Invalid player ID' },
+                    { status: 400 }
+                );
+            }
+            
             const player = await prisma.player.findUnique({
                 where: { id: params.id },
                 include: {
@@ -227,7 +312,13 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
             }
 
             // Check permissions
-            if (player.team.createdById !== session.user.id && session.user.role !== 'ADMIN') {
+            // Allow if:
+            // 1. User is a Manager
+            // 2. User is the team creator
+            const isManager = session.user.role === 'Manager';
+            const isTeamCreator = player.team.createdById === session.user.id;
+            
+            if (!isManager && !isTeamCreator) {
                 return NextResponse.json(
                     { error: 'You do not have permission to delete this player' },
                     { status: 403 }

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import prisma from "@/config/prisma";
-import { handleServerError } from "@/app/api/errors_handlers/errors";
+import { prisma } from "../../../config/prisma";
+import { handleServerError } from "../errors_handlers/errors";
 import { GameSchema } from "../types/types";
-import { withAuth } from "@/utils/auth-utils";
+import { withAuth } from "../../../utils/auth-utils";
 
 /**
  * @swagger

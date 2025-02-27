@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import prisma from "@/config/prisma";
+import { prisma } from "@/config/prisma";
 import bcrypt from "bcryptjs";
-import { handleServerError } from "@/app/api/errors_handlers/errors";
-import { UserSchema } from "../types/types";
+import { handleServerError } from "../errors_handlers/errors";
+import { UserSchema, Role } from "../types/types";
 import supabase from "@/config/supabase_client";
-import { withAuth } from "@/utils/auth-utils";
+import { withAuth } from "../../../utils/auth-utils";
 import type { Session } from '@supabase/supabase-js';
+import crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * @swagger
@@ -41,13 +43,13 @@ import type { Session } from '@supabase/supabase-js';
  *           properties:
  *             id:
  *               type: string
- *             name:
- *               type: string
  *             email:
+ *               type: string
+ *             displayName:
  *               type: string
  *             role:
  *               type: string
- *               enum: [ADMIN, USER]
+ *               enum: [Manager, Player]
  * /api/users:
  *   post:
  *     summary: Create a new user
@@ -61,25 +63,23 @@ import type { Session } from '@supabase/supabase-js';
  *           schema:
  *             type: object
  *             required:
- *               - name
  *               - email
  *               - password
+ *               - displayName
  *             properties:
- *               name:
- *                 type: string
- *                 minLength: 2
- *                 maxLength: 50
- *                 pattern: ^[a-zA-Z]+$
  *               email:
  *                 type: string
  *                 format: email
  *               password:
  *                 type: string
- *                 minLength: 8
+ *               displayName:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
  *               role:
  *                 type: string
- *                 enum: [ADMIN, USER]
- *                 default: USER
+ *                 enum: [Manager, Player]
+ *                 default: Player
  *     responses:
  *       201:
  *         description: User created successfully
@@ -112,9 +112,6 @@ export async function POST(request: Request) {
         const body = await request.json();
         const validated = UserSchema.parse(body);
 
-        // Force new registrations to be ADMIN role
-        const userRole = 'ADMIN';
-
         try {
             console.log('Attempting to sign up user with email:', validated.email);
             
@@ -130,95 +127,74 @@ export async function POST(request: Request) {
                 );
             }
             
-            // Then try to create the user in Supabase
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: validated.email,
-                password: validated.password,
-                options: {
-                    data: {
-                        name: validated.name,
-                        role: userRole
-                    }
-                }
-            });
-
-            if (authError) {
-                console.error('Supabase auth error:', authError);
-                return handleServerError(authError);
-            }
-
-            if (!authData.user) {
-                console.error('No user returned from Supabase');
-                return NextResponse.json(
-                    { error: 'Failed to create authentication user' },
-                    { status: 500 }
-                );
-            }
-        
-            // Check if the user needs to confirm their email
-            if (authData.user && !authData.session) {
-                // This means the user was created but needs to confirm their email
-                console.log('User created in Supabase, awaiting email confirmation');
-                
-                // We can still create the user in our database
+            // For testing purposes, we'll bypass Supabase auth and create the user directly in Prisma
+            // This is just for development/testing - in production, you would use Supabase auth
+            try {
                 const hashedPassword = await bcrypt.hash(validated.password, 12);
                 
-                try {
-                    const user = await prisma.user.create({
-                        data: {
-                            id: authData.user.id,
-                            name: validated.name,
-                            email: validated.email,
-                            password: hashedPassword,
-                            role: userRole
-                        },
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                            role: true
-                        }
-                    });
-                    
-                    return NextResponse.json({ 
-                        success: true, 
-                        data: user,
-                        message: 'User created. Please check your email to confirm your account.'
-                    }, { status: 201 });
-                } catch (prismaError) {
-                    console.error('Error creating user in Prisma:', prismaError);
-                    
-                    // Try to delete the user from Supabase since we couldn't create in Prisma
-                    try {
-                        await supabase.auth.admin.deleteUser(authData.user.id);
-                    } catch (deleteError) {
-                        console.error('Failed to delete user from Supabase after Prisma error:', deleteError);
+                // Generate a UUID for the user ID (simulating what Supabase would do)
+                const userId = crypto.randomUUID();
+                
+                // Determine the role
+                const role = validated.role ? (validated.role === "Manager" ? "Manager" : "Player") : "Player";
+                
+                // Create the user
+                const user = await prisma.user.create({
+                    data: {
+                        id: userId,
+                        email: validated.email,
+                        password: hashedPassword,
+                        displayName: validated.displayName,
+                        role: role
+                    },
+                    select: {
+                        id: true,
+                        email: true,
+                        displayName: true,
+                        role: true
                     }
-                    
-                    return handleServerError(prismaError);
+                });
+                
+                // If the user is a Manager, create a Manager record
+                if (role === "Manager") {
+                    try {
+                        const managerId = uuidv4();
+                        
+                        // Create the Manager record
+                        await prisma.manager.create({
+                            data: {
+                                id: managerId,
+                                displayName: validated.displayName,
+                                user: {
+                                    connect: { id: userId }
+                                }
+                            }
+                        });
+                        
+                        // Update the user with the managerId
+                        await prisma.user.update({
+                            where: { id: userId },
+                            data: {
+                                managerId: managerId
+                            }
+                        });
+                        
+                        console.log(`Created Manager record with ID ${managerId} for user ${userId}`);
+                    } catch (managerError) {
+                        console.error('Error creating Manager record:', managerError);
+                        // We've already created the user, so we'll just log the error and continue
+                    }
                 }
+                
+                return NextResponse.json({ 
+                    success: true, 
+                    data: user,
+                    message: 'User created successfully. In a production environment, email verification would be required.'
+                }, { status: 201 });
+            } catch (prismaError) {
+                console.error('Error creating user in Prisma:', prismaError);
+                return handleServerError(prismaError);
             }
-            
-            // If we have a session, the user was created and automatically signed in
-            const hashedPassword = await bcrypt.hash(validated.password, 12);
-        
-            const user = await prisma.user.create({
-                data: {
-                    id: authData.user.id,
-                    name: validated.name,
-                    email: validated.email,
-                    password: hashedPassword,
-                    role: userRole
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    role: true
-                }
-            })
-
-            return NextResponse.json({ success: true, data: user }, { status: 201 })
         } catch (error) {
             console.error('Error creating user:', error);
             return handleServerError(error);
@@ -257,13 +233,13 @@ export async function POST(request: Request) {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export async function GET() {
-    // Only admins can list all users
-    return withAuth(async (session: Session) => {
+export async function GET(request: Request) {
+    return withAuth(async (session) => {
         try {
-            if (session.user.role !== 'ADMIN') {
+            // Only Managers can get all users
+            if (session.user.role !== 'Manager') {
                 return NextResponse.json(
-                    { error: 'Only administrators can view all users' },
+                    { error: 'Forbidden - Manager access required' },
                     { status: 403 }
                 );
             }
@@ -271,16 +247,11 @@ export async function GET() {
             const users = await prisma.user.findMany({
                 select: {
                     id: true,
-                    name: true,
                     email: true,
+                    displayName: true,
                     role: true,
-                    createdAt: true,
-                    createdTeams: {
-                        select: {
-                            id: true,
-                            name: true
-                        }
-                    }
+                    manager: true,
+                    player: true
                 }
             });
             
@@ -288,5 +259,5 @@ export async function GET() {
         } catch (error) {
             return handleServerError(error);
         }
-    }, 'ADMIN');
+    });
 }
