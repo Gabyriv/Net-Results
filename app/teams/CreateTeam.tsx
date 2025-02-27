@@ -1,11 +1,11 @@
 "use client"
+
 import { useState } from 'react';
-import ParentComponent from '../managers/CreateManager';
+import * as ManagerComponent from '../managers/CreateManager';
 import { createTeamAction } from '../action/Teams/createTeamAction';
 import { Button } from '@/components/ui/button';
 import TeamModal from '@/components/modals/modal.create-team';
-
-
+import { Team } from '@prisma/client';
 
 const ParentComponent = () => {
     const [isLoading, setLoading] = useState(false);
@@ -18,6 +18,13 @@ const ParentComponent = () => {
         try {
             setLoading(true);
             const response = createTeamAction(teamData);
+
+            if (!response) throw new Error('Something went wrong');
+            
+            console.log('Team saved:', response);
+        
+            setModalOpen(false);
+
         } catch (error) {
             console.error('Error saving team:', error);
         }
@@ -26,14 +33,10 @@ const ParentComponent = () => {
         }
     };
 
-    return (
-        <div>
-        {
-            isLoading && <p>Creating Template</p>
-        }
+  if (isLoading) return (<p>Creating Team...</p>)
 
-        {
-            !isLoading &&
+    return (
+
             <>
             <Button onClick={() => setModalOpen(true)}>Add Team</Button>
             <TeamModal
@@ -42,9 +45,6 @@ const ParentComponent = () => {
             onSave={handleSaveTeam}
             />
             </>
-        }
-        </div>
+     
     );
 };
-
-export default ParentComponent;

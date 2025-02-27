@@ -13,11 +13,10 @@ export default async function Account() {
     } = await supabase.auth.getUser()
 
 
-// TODO: check if user is logged in
-// vvvvvvv Uncomment this vvvvvvvv
-    // if (!user) {
-    //     return  redirect('/sign-in')
-    // }
+
+    if (!user) {
+        return  redirect('/sign-in')
+    }
 
 
 

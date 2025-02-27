@@ -4,6 +4,7 @@ import PlayerModal from '@/components/modals/modals.create-player';
 import { Button } from '@/components/ui/button';
 import React, { useState } from 'react';
 import { createPlayerAction } from '../action/player/createPlayerAction';
+import { Player } from '@prisma/client';
 
 const ParentComponent = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -27,14 +28,10 @@ const ParentComponent = () => {
 
   };
 
+  if (isLoading) return (<p>Creating Player...</p>)
+    
   return (
-    <div>
-  {
-    isLoading && <p>Creating Player...</p>
-  }
-  
-  {
-    !isLoading &&   
+   
     <>
       <Button onClick={() => setIsModalOpen(true)}>Add Player</Button>
         <PlayerModal 
@@ -43,11 +40,7 @@ const ParentComponent = () => {
         onSave={handleSavePlayer}
         />
     </>
-  }
-
-
-    </div>
-  );
+  )
 };
 
 export default ParentComponent;

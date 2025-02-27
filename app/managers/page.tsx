@@ -1,19 +1,48 @@
+"use server"
+
 import { prisma } from "@/lib/prisma"
 import { Suspense } from "react"
 import CreateManager from "./CreateManager"
+import { createClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
+import { Loader } from "@/components/loader";
 
 export default async function ManagerPage() {
-    const managers = await prisma.manager.findMany({select: {id: true, displayName: true, }})
 
-    managers.forEach(manager => {
-        console.info('Manager ID:', manager.id, 'Manager Display Name:', manager.displayName)
-    })
+    const supabase = await createClient();
 
-    return (
-        <div>
-            <h1>Manager</h1>
-            <Suspense fallback={<div>Loading...</div>}>
-            </Suspense>
-        </div>
-    )
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+  
+    if (!user) {
+      return redirect("/sign-in");
+    }
+
+    const manager = await prisma.manager.findUnique({where: {userId: user.id}})
+
+    const player = await prisma.player.findUnique({where: {userId: user.id}})
+
+    if (player)
+        { redirect("/players") }
+
+    if (!manager)
+        { redirect("/managers/new") }
+
+
+    // manager page to create teams and players
+return (
+    <>
+      <Suspense fallback={<Loader title="Loading..." />}>
+        {/* <ViewTeams />
+        <ViewPlayers />
+        <CreateTeams/>
+        <CreatePlayers/> */}
+      </Suspense>
+    </>
+)
+
+
+
+    
 }
