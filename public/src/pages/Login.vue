@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-100">
-    <div class="max-w-md w-full bg-white p-8 rounded shadow">
+  <div class="min-h-screen flex items-center justify-center bg-blue-200">
+    <div class="max-w-md w-full bg-white p-8 rounded-lg shadow-2x1"> 
       <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
       <form @submit.prevent="login">
         <div class="mb-4">
@@ -9,7 +9,7 @@
             v-model="email"
             type="email"
             id="email"
-            class="mt-1 block w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500"
+            class="mt-1 block w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:border-blue-500"
             placeholder="Enter your email"
             required
           />
@@ -20,12 +20,12 @@
             v-model="password"
             type="password"
             id="password"
-            class="mt-1 block w-full border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500"
+            class="mt-1 block w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:border-blue-500"
             placeholder="Enter your password"
             required
           />
         </div>
-        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+        <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 rounded-lg hover:from-blue-600 hover:to-blue-800 transition duration-300">
           Login
         </button>
       </form>

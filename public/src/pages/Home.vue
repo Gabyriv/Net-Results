@@ -1,17 +1,29 @@
 <template>
   <DefaultLayout>
-    <div class="container mx-auto p-4">
-      <div class="relative w-full h-screen banner-container overflow-hidden mb-4 shadow-lg bg-gray-800">
-        <img src="/banner.jpeg" alt="Banner" class="w-full h-full object-cover" />
-        <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="min-h-screen flex flex-col">
+      <div class="relative w-full flex-grow banner-container overflow-hidden mb-4 shadow-lg bg-gradient-to-r from-blue-500"> <!-- Added gradient background -->
+        <img src="/banner.jpeg" alt="Banner" class="absolute inset-0 w-full h-full object-cover opacity-100" /> <!-- Adjusted opacity for better text visibility -->
+        <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10">
           <div class="text-center">
-            <h1 class="text-7xl font-bold text-white">Volleyball Stats App</h1>
-            <p class="text-lg text-white mt-4">Track your team's performance and analyze match statistics.</p>
+            <h1 class="text-7xl font-bold text-white drop-shadow-lg">Volleyball Stats App</h1>
+            <p class="text-lg text-white mt-4 drop-shadow-lg">Track your team's performance and analyze match statistics.</p>
           </div>
         </div>
       </div>
-      <div class="flex justify-between">
+      <div class="container mx-auto p-4 flex justify-between mt-8">
         <!-- Additional content can go here -->
+        <div class="w-1/3 p-4 bg-white rounded-lg shadow-lg">
+          <h2 class="text-xl font-bold mb-2">Feature 1</h2>
+          <p class="text-gray-700">Description of feature 1.</p>
+        </div>
+        <div class="w-1/3 p-4 bg-white rounded-lg shadow-lg">
+          <h2 class="text-xl font-bold mb-2">Feature 2</h2>
+          <p class="text-gray-700">Description of feature 2.</p>
+        </div>
+        <div class="w-1/3 p-4 bg-white rounded-lg shadow-lg">
+          <h2 class="text-xl font-bold mb-2">Feature 3</h2>
+          <p class="text-gray-700">Description of feature 3.</p>
+        </div>
       </div>
     </div>
   </DefaultLayout>
@@ -33,5 +45,6 @@ export default {
 .banner-container {
   width: 100%;
   height: 100vh; /* Full height of the viewport */
+  position: relative;
 }
 </style>

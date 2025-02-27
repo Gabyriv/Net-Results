@@ -8,7 +8,7 @@ import Login from '../pages/Login.vue'
 import Register from '../pages/Register.vue'
 
 const routes = [
-  { path: '/', name: 'Home', component: Home },
+  { path: '/' , redirect: '/home' },
   { path: '/dashboard', name: 'Dashboard', component: Dashboard },
   { path: '/players', name: 'Players', component: Players },
   { path: '/matches', name: 'Matches', component: Matches },
