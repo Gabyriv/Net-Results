@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ? = optional
+// @id = primary key
+// @unique = unique constraint
+// @relation = foreign key constraint (fields: [field], references: [field])
+// @default = default value
+
+model User {
+  id          String   @id @unique
+  email       String   @unique
+  password    String
+  displayName String
+  role        Role     @default(Player)
+  managerId   String?  @unique
+  manager     Manager?
+  player      Player?
+}
+
+model Manager {
+  id          String   @id @unique 
+  displayName String
+  teams       Team[]
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @unique
+}
+
+model Team {
+  id        String   @id @unique
+  name      String
+  managerId String
+  players   Player[]
+  manager   Manager  @relation(fields: [managerId], references: [id])
+}
+
+model Player {
+  id          String       @id @unique
+  displayName String
+  gamesPlayed Int
+  team        Team         @relation(fields: [teamId], references: [id])
+  teamId      String
+  user        User         @relation(fields: [userId], references: [id])
+  userId      String       @unique
+  playerStats PlayerStat[]
+}
+
+model PlayerStat {
+  id         String   @id @default(uuid())
+  value      Float    // Store the actual stat value
+  created_at DateTime @default(now())
+  dayOfGame  String
+  player     Player   @relation(fields: [playerId], references: [id])
+  playerId   String   
+  stat       Stat     @relation(fields: [statId], references: [id])
+  statId     Int     
+
+  @@index([playerId])
+  @@index([statId])
+}
+
+model Stat {
+  id          Int          @id @unique
+  name        String       @unique
+  playerStats PlayerStat[]
+}
+
+enum Role {
+  Manager
+  Player
+}

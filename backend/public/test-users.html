@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test User Endpoints</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #333;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+    .card {
+      background-color: #f9f9f9;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px 20px;
+      margin: 8px 0;
+      display: inline-block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      font-weight: bold;
+    }
+    pre {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .success {
+      color: #4CAF50;
+    }
+    .error {
+      color: #f44336;
+    }
+  </style>
+</head>
+<body>
+  <h1>Test User Endpoints</h1>
+  <p>This page allows you to test the user endpoints without affecting the real database.</p>
+  
+  <div class="card">
+    <h2>Reset Mock Database</h2>
+    <p>Reset the mock database to its initial state with default test users.</p>
+    <button id="resetBtn">Reset Mock Database</button>
+    <pre id="resetResult"></pre>
+  </div>
+  
+  <div class="card">
+    <h2>Create User</h2>
+    <p>Test the POST /api/users endpoint to create a new user.</p>
+    <div class="form-group">
+      <label for="name">Name:</label>
+      <input type="text" id="name" placeholder="Enter name" value="TestUser">
+    </div>
+    <div class="form-group">
+      <label for="email">Email:</label>
+      <input type="email" id="email" placeholder="Enter email" value="testuser@example.com">
+    </div>
+    <div class="form-group">
+      <label for="password">Password:</label>
+      <input type="password" id="password" placeholder="Enter password" value="password123">
+    </div>
+    <button id="createBtn">Create User</button>
+    <pre id="createResult"></pre>
+  </div>
+  
+  <div class="card">
+    <h2>Get All Users</h2>
+    <p>Test the GET /api/users endpoint to retrieve all users.</p>
+    <div class="form-group">
+      <label for="role">Role:</label>
+      <select id="role">
+        <option value="admin">As Admin</option>
+        <option value="user">As Regular User</option>
+      </select>
+    </div>
+    <button id="getAllBtn">Get All Users</button>
+    <pre id="getAllResult"></pre>
+  </div>
+  
+  <script>
+    // Helper function to format JSON response
+    function formatResponse(response) {
+      return JSON.stringify(response, null, 2);
+    }
+    
+    // Reset mock database
+    document.getElementById('resetBtn').addEventListener('click', async () => {
+      const resetResult = document.getElementById('resetResult');
+      resetResult.textContent = 'Resetting...';
+      
+      try {
+        const response = await fetch('/api/test/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'reset' }),
+        });
+        
+        const result = await response.json();
+        resetResult.textContent = formatResponse(result);
+        resetResult.className = response.ok ? 'success' : 'error';
+      } catch (error) {
+        resetResult.textContent = `Error: ${error.message}`;
+        resetResult.className = 'error';
+      }
+    });
+    
+    // Create user
+    document.getElementById('createBtn').addEventListener('click', async () => {
+      const createResult = document.getElementById('createResult');
+      createResult.textContent = 'Creating user...';
+      
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      try {
+        const response = await fetch('/api/test/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'create',
+            userData: { name, email, password }
+          }),
+        });
+        
+        const result = await response.json();
+        createResult.textContent = formatResponse(result);
+        createResult.className = response.ok ? 'success' : 'error';
+      } catch (error) {
+        createResult.textContent = `Error: ${error.message}`;
+        createResult.className = 'error';
+      }
+    });
+    
+    // Get all users
+    document.getElementById('getAllBtn').addEventListener('click', async () => {
+      const getAllResult = document.getElementById('getAllResult');
+      getAllResult.textContent = 'Fetching users...';
+      
+      const role = document.getElementById('role').value;
+      const asAdmin = role === 'admin';
+      
+      try {
+        const response = await fetch('/api/test/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'getAll',
+            asAdmin
+          }),
+        });
+        
+        const result = await response.json();
+        getAllResult.textContent = formatResponse(result);
+        getAllResult.className = response.ok ? 'success' : 'error';
+      } catch (error) {
+        getAllResult.textContent = `Error: ${error.message}`;
+        getAllResult.className = 'error';
+      }
+    });
+  </script>
+</body>
+</html>
