@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/config/prisma";
+import { prisma } from "@/config/prisma";
 import { handleServerError } from "@/app/api/errors_handlers/errors";
 import { PlayerUpdateSchema } from "../../types/types";
 import { withAuth } from "@/utils/auth-utils";
@@ -33,10 +33,10 @@ import { withAuth } from "@/utils/auth-utils";
  */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     console.log('GET /api/players/id - Starting request for ID:', params.id);
-    
+
     return withAuth(request, async (session) => {
         console.log('GET /api/players/id - Authenticated with session:', JSON.stringify(session));
-        
+
         try {
             // Validate the ID parameter
             if (!params.id || typeof params.id !== 'string') {
@@ -45,7 +45,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
                     { status: 400 }
                 );
             }
-            
+
             const player = await prisma.player.findUnique({
                 where: { id: params.id },
                 include: {
@@ -146,7 +146,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
  *         description: Player not found
  */
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
-    return withAuth(async (session) => {
+    return withAuth(request, async (session) => {
         try {
             // Validate the ID parameter
             if (!params.id || typeof params.id !== 'string') {
@@ -155,7 +155,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
                     { status: 400 }
                 );
             }
-            
+
             // Get current player and team info
             const currentPlayer = await prisma.player.findUnique({
                 where: { id: params.id },
@@ -163,7 +163,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
                     team: {
                         select: {
                             id: true,
-                            createdById: true
+                            managerId: true
                         }
                     }
                 }
@@ -180,9 +180,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             // Allow if:
             // 1. User is a Manager
             // 2. User is the team creator
-            const isManager = session.user.role === 'Manager';
-            const isTeamCreator = currentPlayer.team.createdById === session.user.id;
-            
+            const isManager = session.userRole === 'Manager';
+            const isTeamCreator = currentPlayer.team.managerId === session.userId;
+
             if (!isManager && !isTeamCreator) {
                 return NextResponse.json(
                     { error: 'You do not have permission to update this player' },
@@ -192,7 +192,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
             const body = await request.json();
             const validated = PlayerUpdateSchema.safeParse(body);
-            
+
             if (!validated.success) {
                 return NextResponse.json(
                     { error: 'Invalid data format', details: validated.error.format() },
@@ -204,7 +204,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             if (validated.data.teamId && validated.data.teamId !== currentPlayer.teamId) {
                 const newTeam = await prisma.team.findUnique({
                     where: { id: validated.data.teamId },
-                    select: { createdById: true }
+                    select: { managerId: true }
                 });
 
                 if (!newTeam) {
@@ -215,7 +215,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
                 }
 
                 // Only allow if user is Manager or creator of both teams
-                if (!isManager && newTeam.createdById !== session.user.id) {
+                if (!isManager && newTeam.managerId !== session.userId) {
                     return NextResponse.json(
                         { error: 'You do not have permission to move this player to the specified team' },
                         { status: 403 }
@@ -283,7 +283,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
  *         description: Player not found
  */
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-    return withAuth(async (session) => {
+    return withAuth(request, async (session) => {
         try {
             // Validate the ID parameter
             if (!params.id || typeof params.id !== 'string') {
@@ -292,13 +292,13 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
                     { status: 400 }
                 );
             }
-            
+
             const player = await prisma.player.findUnique({
                 where: { id: params.id },
                 include: {
                     team: {
                         select: {
-                            createdById: true
+                            managerId: true
                         }
                     }
                 }
@@ -315,9 +315,9 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
             // Allow if:
             // 1. User is a Manager
             // 2. User is the team creator
-            const isManager = session.user.role === 'Manager';
-            const isTeamCreator = player.team.createdById === session.user.id;
-            
+            const isManager = session.userRole === 'Manager';
+            const isTeamCreator = player.team.managerId === session.userId;
+
             if (!isManager && !isTeamCreator) {
                 return NextResponse.json(
                     { error: 'You do not have permission to delete this player' },

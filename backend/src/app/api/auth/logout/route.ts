@@ -1,5 +1,4 @@
-import { NextResponse, Request } from "next/server";
-import supabase from "@/config/supabase_client";
+import { NextResponse } from "next/server";
 import { handleServerError } from "@/app/api/errors_handlers/errors";
 
 /**
@@ -27,7 +26,7 @@ import { handleServerError } from "@/app/api/errors_handlers/errors";
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export async function POST(request: Request) {
+export async function POST() {
     try {
         // For testing purposes, we'll just clear the auth cookie
         // This is just for development/testing - in production, you would use Supabase auth

@@ -4,6 +4,7 @@ import { handleServerError } from "../errors_handlers/errors";
 import { PlayerSchema } from "../types/types";
 import { withAuth } from "../../../utils/auth-utils";
 import { v4 as uuidv4 } from 'uuid';
+import { Prisma } from '@prisma/client';
 
 /**
  * @swagger
@@ -69,8 +70,14 @@ export async function POST(request: Request) {
             const body = await request.json();
             console.log('POST /api/players - Request body:', JSON.stringify(body));
             
+            // Handle case differences in field names (teamID vs teamId)
+            const normalizedBody = {
+                ...body,
+                teamId: body.teamId || body.teamID // Accept both teamId and teamID
+            };
+            
             // Validate the request body
-            const validated = PlayerSchema.safeParse(body);
+            const validated = PlayerSchema.safeParse(normalizedBody);
             if (!validated.success) {
                 return NextResponse.json({ 
                     error: 'Invalid input', 
@@ -90,8 +97,8 @@ export async function POST(request: Request) {
                 }, { status: 404 });
             }
             
-            // Create the player
-            const playerData: any = {
+            // Create the player base data
+            const playerData: Omit<Prisma.PlayerCreateInput, 'user'> = {
                 id: uuidv4(), // Generate a UUID for the player ID
                 displayName: validated.data.displayName,
                 gamesPlayed: validated.data.gamesPlayed || 0,
@@ -100,29 +107,38 @@ export async function POST(request: Request) {
                 }
             };
             
+            // Complete player data with user relationship
+            let completePlayerData: Prisma.PlayerCreateInput;
+            
             // If userId is provided, connect to existing user
             if (validated.data.userId) {
-                playerData.user = {
-                    connect: { id: validated.data.userId }
+                completePlayerData = {
+                    ...playerData,
+                    user: {
+                        connect: { id: validated.data.userId }
+                    }
                 };
             } else {
                 // Create a new user for this player
                 const newUserId = uuidv4();
-                playerData.user = {
-                    create: {
-                        id: newUserId,
-                        email: `player-${newUserId.substring(0, 8)}@example.com`,
-                        password: "defaultPassword", // This should be hashed in production
-                        displayName: validated.data.displayName,
-                        role: "Player"
+                completePlayerData = {
+                    ...playerData,
+                    user: {
+                        create: {
+                            id: newUserId,
+                            email: `player-${newUserId.substring(0, 8)}@example.com`,
+                            password: "defaultPassword", // This should be hashed in production
+                            displayName: validated.data.displayName,
+                            role: "Player"
+                        }
                     }
                 };
             }
             
-            console.log('Creating player with data:', JSON.stringify(playerData, null, 2));
+            console.log('Creating player with data:', JSON.stringify(completePlayerData, null, 2));
             
             const player = await prisma.player.create({
-                data: playerData,
+                data: completePlayerData,
                 include: {
                     team: {
                         select: {

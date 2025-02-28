@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import supabase from "@/config/supabase_client";
 import { handleServerError } from "@/app/api/errors_handlers/errors";
 import { z } from "zod";
 
