@@ -106,16 +106,20 @@ export async function PUT(request: Request, { params }: { params: { id: string }
                     where: { id: params.id },
                     data: {
                         ...(validated.data.name && { name: validated.data.name }),
-                        updatedAt: new Date()
                     },
                     include: {
                         players: true,
-                        createdBy: {
+                        manager: {
                             select: {
                                 id: true,
-                                email: true,
                                 displayName: true,
-                                role: true
+                                user: {
+                                    select: {
+                                        id: true,
+                                        email: true,
+                                        displayName: true,
+                                    }
+                                }
                             }
                         }
                     }

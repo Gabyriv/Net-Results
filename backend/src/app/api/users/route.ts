@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/config/prisma";
 import bcrypt from "bcryptjs";
 import { handleServerError } from "../errors_handlers/errors";
-import { UserSchema, Role } from "../types/types";
-import supabase from "@/config/supabase_client";
+import { UserSchema } from "../types/types";
 import { withAuth } from "../../../utils/auth-utils";
-import type { Session } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -234,10 +232,10 @@ export async function POST(request: Request) {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export async function GET(request: Request) {
-    return withAuth(async (session) => {
+    return withAuth(request, async (session) => {
         try {
             // Only Managers can get all users
-            if (session.user.role !== 'Manager') {
+            if (session.userRole !== 'Manager') {
                 return NextResponse.json(
                     { error: 'Forbidden - Manager access required' },
                     { status: 403 }

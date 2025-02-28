@@ -1,4 +1,3 @@
-import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
@@ -57,7 +56,9 @@ export async function checkRole(requiredRole?: Role): Promise<AuthResult> {
                 } as any,
                 access_token: authCookie.value,
                 refresh_token: 'mock-refresh-token',
-                expires_at: Date.now() + 3600
+                expires_at: Date.now() + 3600,
+                expires_in: 3600,
+                token_type: 'bearer'
             }
             
             // If a role is required, check that it matches
@@ -104,10 +105,14 @@ export async function withAuth<T>(
     const authResult = await checkRole(requiredRole);
 
     if (!authResult.authorized) {
-        return NextResponse.json(
-            { error: authResult.error },
-            { status: authResult.status }
-        );
+        if ('error' in authResult && 'status' in authResult) {
+            return NextResponse.json(
+                { error: authResult.error },
+                { status: authResult.status }
+            );
+        } else {
+            throw new Error('Auth result is missing error and status properties');
+        }
     }
 
     // Extract user information from the session
