@@ -1,7 +1,7 @@
 <template>
   <DashboardLayout>
     <div class="container mx-auto p-4">
-      <h1 class="text-3xl font-bold mb-4">Dashboard</h1>
+      <h1 class="text-3xl font-bold mb-4"></h1> <!--Dashboard erase-->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <StatCard title="Total Matches" :value="totalMatches" icon="mdi-soccer" />
         <StatCard title="Total Players" :value="totalPlayers" icon="mdi-account-group" />
