@@ -16,21 +16,19 @@ export async function POST(request: Request) {
 
         try {
             console.log('Attempting to sign up user with email:', validated.email);
-            
+
             // First check if the user already exists in Prisma
             const existingUser = await prisma.user.findUnique({
                 where: { email: validated.email }
             });
-            
+
             if (existingUser) {
                 return NextResponse.json(
                     { error: 'Email already exists' },
                     { status: 409 }
                 );
             }
-            
-            // For testing purposes, we'll bypass Supabase auth and create the user directly in Prisma
-            // This is just for development/testing - in production, you would use Supabase auth
+
             try {
                 const hashedPassword = await bcrypt.hash(validated.password, 12);
                 

@@ -7,61 +7,11 @@ const LoginSchema = z.object({
     password: z.string()
 });
 
-/**
- * @swagger
- * /api/login:
- *   post:
- *     summary: User login
- *     description: Authenticates a user with email and password
- *     tags:
- *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *       401:
- *         description: Authentication failed
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
 export async function POST(request: Request) {
     try {
         const body = await request.json();
         const validated = LoginSchema.parse(body);
 
-        // For testing purposes, we'll bypass Supabase auth and check credentials directly in Prisma
-        // This is just for development/testing - in production, you would use Supabase auth
         try {
             const { prisma } = await import("@/config/prisma");
             const bcrypt = await import("bcryptjs");
@@ -95,7 +45,6 @@ export async function POST(request: Request) {
                 );
             }
             
-            // Create a mock session with the user ID encoded in the token
             const session = {
                 user: {
                     id: user.id,
@@ -106,14 +55,18 @@ export async function POST(request: Request) {
                         displayName: user.displayName
                     }
                 },
-                access_token: `mock_token_${user.id}_${Date.now()}`,
-                refresh_token: `mock_refresh_${Date.now()}`
+                access_token: `${user.id}_${Date.now()}`,
+                refresh_token: `${Date.now()}`
             };
             
-            // Set auth cookie
+            // Set auth cookie and also return token for frontend storage
             const response = NextResponse.json({ 
                 success: true, 
-                data: { session, user: session.user } 
+                data: { 
+                    session, 
+                    user: session.user,
+                    token: session.access_token 
+                } 
             }, { status: 200 });
             
             response.cookies.set('auth_token', session.access_token, {
