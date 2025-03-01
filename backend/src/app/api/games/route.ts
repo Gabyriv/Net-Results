@@ -4,50 +4,9 @@ import { handleServerError } from "../errors_handlers/errors";
 import { GameSchema } from "../types/types";
 import { withAuth } from "../../../utils/auth-utils";
 
-/**
- * @swagger
- * /api/games:
- *   post:
- *     summary: Create a new game
- *     description: Creates a new game record for a team
- *     tags:
- *       - Games
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - teamId
- *               - opponent
- *             properties:
- *               teamId:
- *                 type: string
- *                 format: uuid
- *               opponent:
- *                 type: string
- *                 minLength: 2
- *                 maxLength: 50
- *               result:
- *                 type: string
- *                 enum: [Win, Loss, Draw]
- *     responses:
- *       201:
- *         description: Game created successfully
- *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Not team owner or admin
- *       404:
- *         description: Team not found
- */
+
 export async function POST(request: Request) {
-    return withAuth(async (session) => {
+    return withAuth(request, async (session) => {
         try {
             const body = await request.json();
             const validated = GameSchema.parse(body);

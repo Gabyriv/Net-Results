@@ -7,103 +7,7 @@ import { withAuth } from "../../../utils/auth-utils";
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * @swagger
- * components:
- *   schemas:
- *     ErrorResponse:
- *       type: object
- *       properties:
- *         error:
- *           type: string
- *         details:
- *           oneOf:
- *             - type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   code:
- *                     type: string
- *                   message:
- *                     type: string
- *                   path:
- *                     type: array
- *                     items:
- *                       type: string
- *             - type: string
- *     UserResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *         data:
- *           type: object
- *           properties:
- *             id:
- *               type: string
- *             email:
- *               type: string
- *             displayName:
- *               type: string
- *             role:
- *               type: string
- *               enum: [Manager, Player]
- * /api/users:
- *   post:
- *     summary: Create a new user
- *     description: Creates a new user with the provided information
- *     tags:
- *       - Users
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *               - displayName
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *               displayName:
- *                 type: string
- *                 minLength: 2
- *                 maxLength: 50
- *               role:
- *                 type: string
- *                 enum: [Manager, Player]
- *                 default: Player
- *     responses:
- *       201:
- *         description: User created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/UserResponse'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       409:
- *         description: Email already exists
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
-*/
+
 export async function POST(request: Request) {
     // No auth required for user registration
     try {
@@ -202,35 +106,7 @@ export async function POST(request: Request) {
     }
 }
 
-/**
- * @swagger
- * /api/users:
- *   get:
- *     summary: Get all users
- *     description: Retrieves a list of all users
- *     tags:
- *       - Users
- *     responses:
- *       200:
- *         description: List of users retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/UserResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
+
 export async function GET(request: Request) {
     return withAuth(request, async (session) => {
         try {

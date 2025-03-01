@@ -6,51 +6,7 @@ import { withAuth } from "../../../utils/auth-utils";
 import { v4 as uuidv4 } from 'uuid';
 import { Prisma } from '@prisma/client';
 
-/**
- * @swagger
- * /api/players:
- *   post:
- *     summary: Create a new player
- *     description: Creates a new player for a team
- *     tags:
- *       - Players
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - displayName
- *               - teamId
- *             properties:
- *               displayName:
- *                 type: string
- *                 minLength: 2
- *                 maxLength: 50
- *               teamId:
- *                 type: string
- *                 format: uuid
- *               userId:
- *                 type: string
- *                 format: uuid
- *               gamesPlayed:
- *                 type: integer
- *                 minimum: 0
- *     responses:
- *       201:
- *         description: Player created successfully
- *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Manager access required
- *       404:
- *         description: Team not found
- */
+
 export async function POST(request: Request) {
     console.log('POST /api/players - Starting request');
     
@@ -168,24 +124,7 @@ export async function POST(request: Request) {
     }, 'Manager'); // Explicitly require Manager role
 }
 
-/**
- * @swagger
- * /api/players:
- *   get:
- *     summary: Get all players
- *     description: Retrieves a list of all players
- *     tags:
- *       - Players
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of players retrieved successfully
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Manager access required
- */
+
 export async function GET(request: Request) {
     console.log('GET /api/players - Starting request');
     

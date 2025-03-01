@@ -1,36 +1,12 @@
 import { NextResponse } from "next/server";
-import prisma from "@/config/prisma";
+import { prisma } from "@/config/prisma";
 import { handleServerError } from "@/app/api/errors_handlers/errors";
 import { GameUpdateSchema } from "../../types/types";
 import { withAuth } from "@/utils/auth-utils";
 
-/**
- * @swagger
- * /api/games/{id}:
- *   get:
- *     summary: Get a game by ID
- *     description: Retrieves a specific game's details
- *     tags:
- *       - Games
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Game ID
- *     responses:
- *       200:
- *         description: Game details retrieved successfully
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Game not found
- */
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-    return withAuth(async () => {
+    return withAuth(request, async (session) => {
         try {
             const game = await prisma.game.findUnique({
                 where: { id: params.id },

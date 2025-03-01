@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "../../../utils/auth-utils";
 
 export async function POST(request: Request) {
-    return withAuth(async (session) => {
+    return withAuth(request, async (session) => {
         try {
             const body = await request.json();
             return NextResponse.json({ 
@@ -14,10 +14,10 @@ export async function POST(request: Request) {
                 namePropertyType: body !== null && typeof body === 'object' && 'name' in body ? typeof body.name : 'not present',
                 headers: Object.fromEntries(request.headers),
                 session: {
-                    userId: session.user.id,
-                    userEmail: session.user.email,
-                    userRole: session.user.role,
-                    userMetadata: session.user.user_metadata
+                    userId: session.userId,
+                    userEmail: session.userEmail,
+                    userRole: session.userRole,
+                    userMetadata: session.userMetadata
                 }
             }, { status: 200 });
         } catch (error) {

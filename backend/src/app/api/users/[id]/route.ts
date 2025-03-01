@@ -7,67 +7,7 @@ import { UserUpdateSchema } from "@/app/api/types/types";
 import supabase from "@/config/supabase_client";
 import { withAuth } from "@/utils/auth-utils";
 
-/**
- * @swagger
- * /api/users:
- *   get:
- *     summary: Get all users
- *     description: Retrieves a list of all users
- *     tags:
- *       - Users
- *     responses:
- *       200:
- *         description: List of users retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/UserResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- * 
- * /api/users/{id}:
- *   get:
- *     summary: Get user by ID
- *     description: Retrieves a single user by their ID
- *     tags:
- *       - Users
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: User retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/UserResponse'
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
+
 export async function GET(
     request: Request,
     { params }: { params: { id: string } }
@@ -119,71 +59,7 @@ export async function GET(
     });
 }
 
-/**
- * @swagger
- * /api/users/{id}:
- *   put:
- *     summary: Update user by ID
- *     description: Updates a user by their ID with the provided information
- *     tags:
- *       - Users
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               displayName:
- *                 type: string
- *                 minLength: 2
- *                 maxLength: 50
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *               role:
- *                 type: string
- *                 enum: [Manager, Player]
- *     responses:
- *       200:
- *         description: User updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/UserResponse'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       409:
- *         description: Email already exists
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
+
 export async function PUT(
     request: Request,
     { params }: { params: { id: string } }
@@ -279,37 +155,7 @@ export async function PUT(
     });
 }
 
-/**
- * @swagger
- * /api/users/{id}:
- *   delete:
- *     summary: Delete user by ID
- *     description: Deletes a user by their ID
- *     tags:
- *       - Users
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       204:
- *         description: User deleted successfully
- *         content: {}
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
+
 export async function DELETE(
     request: Request,
     { params }: { params: { id: string } }
@@ -400,14 +246,10 @@ export async function DELETE(
                 where: { id: params.id }
             });
 
-            // In development mode, we skip Supabase auth deletion
-            // In production, you would uncomment this:
-            /*
             const { error: supabaseError } = await supabase.auth.admin.deleteUser(params.id);
             if (supabaseError) {
                 return handleServerError(supabaseError);
             }
-            */
 
             return NextResponse.json({ success: true }, { status: 200 });
         } catch (error) {
