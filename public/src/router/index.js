@@ -6,6 +6,7 @@ import Matches from '../pages/Matches.vue'
 import Statistics from '../pages/Statistics.vue'
 import Login from '../pages/Login.vue'
 import Register from '../pages/Register.vue'
+import FetchApi from '../components/FetchApi.vue'
 
 const routes = [
   { path: '/' , redirect: '/home' },
@@ -16,6 +17,7 @@ const routes = [
   { path: '/login', name: 'Login', component: Login },
   { path: '/register', name: 'Register', component: Register },
   { path: '/home', name: 'Home', component: Home },
+  { path: '/api-test', name: 'ApiTest', component: FetchApi },
 ]
 
 const router = createRouter({
