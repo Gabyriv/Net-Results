@@ -26,6 +26,6 @@ export default {
 <style scoped>
 /* Add any component-specific styles here */
 .text-lg {
-  font-size: 1.50rem; /* This is equivalent to 18px */
+  font-size: 2.50rem; /* This is equivalent to 18px */
 }
 </style>
