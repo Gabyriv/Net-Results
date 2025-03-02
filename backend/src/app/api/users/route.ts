@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/config/prisma";
+import { prisma } from "../../../config/prisma";
 import bcrypt from "bcryptjs";
 import { handleServerError } from "../errors_handlers/errors";
 import { UserSchema } from "../types/types";
 import { withAuth } from "../../../utils/auth-utils";
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+import React, { useEffect, useState } from 'react';
 
 /**
  * @swagger
@@ -259,3 +260,30 @@ export async function GET(request: Request) {
         }
     });
 }
+
+const UsersComponent = () => {
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const response = await fetch('/api/users');
+      const data = await response.json();
+      setUsers(data);
+    };
+
+    fetchUsers();
+  }, []);
+
+  return (
+    <div>
+      <h1>Users</h1>
+      <ul>
+        {users.map(user => (
+          <li key={user.id}>{user.email}</li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default UsersComponent;
