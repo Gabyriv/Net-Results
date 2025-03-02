@@ -25,32 +25,15 @@ export type AuthResult =
   | { authorized: true; session: AuthSession }
   | { authorized: false; error: string; status: number }
 
-export async function checkRole(request: Request | NextApiRequest |null, requiredRole?: Role): Promise<AuthResult> {
+export async function checkRole(request: Request | NextApiRequest | null, requiredRole?: Role): Promise<AuthResult> {
     try {
         console.log('checkRole: Creating Supabase client')
         // Create Supabase server client
         const supabase = await createClient()
         console.log('checkRole: Supabase client created')
         
-        // Get token from request cookies or Authorization header
-        let token = null
-        if (request) {
-            // Try to get token from cookies
-            const cookieHeader = request.headers.get('cookie')
-            if (cookieHeader) {
-                const cookies = parse(cookieHeader)
-                token = cookies.auth_token
-            }
-            
-            // If no token in cookies, try Authorization header
-            if (!token) {
-                const authHeader = request.headers.get('Authorization')
-                if (authHeader && authHeader.startsWith('Bearer ')) {
-                    token = authHeader.substring(7)
-                }
-            }
-        }
-        
+        // Get token from request
+        const token = getTokenFromRequest(request)
         console.log('checkRole: Token found:', !!token)
         
         // Get the user's session
@@ -225,4 +208,13 @@ export function getTokenFromRequest(request: Request | NextApiRequest | null): s
     }
     
     return token;
+}
+
+/**
+ * Parse cookies from a cookie header string
+ * @param cookieHeader The cookie header string
+ * @returns An object with cookie name-value pairs
+ */
+export function parseCookies(cookieHeader: string): Record<string, string> {
+    return parse(cookieHeader);
 }

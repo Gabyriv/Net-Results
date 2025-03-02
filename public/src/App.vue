@@ -1,55 +1,39 @@
 <template>
   <div>
     <router-view></router-view> <!-- This will render the current route component -->
-    <fetchApi />
-    <FetchData />
-    <ul>
-      <li v-for="todo in todos" :key="todo.id">{{ todo.name }}</li>
-    </ul>
   </div>
 </template>
 
 <script>
-import fetchApi from './components/FetchApi.vue'
-import FetchData from './components/FetchData.vue'
-import { supabase } from './config/supabase_client'
+import { onMounted, ref } from 'vue'
+import { useAuth } from './composable/useAuth'
 
 export default {
   name: 'App',
-  components: {
-    fetchApi,
-    FetchData,
-  },
-}
-</script>
-
-<script setup>
-import { ref, onMounted } from 'vue'
-import { supabase } from './config/supabase_client'
-
-const todos = ref([])
-const error = ref(null)
-
-async function getTodos() {
-  try {
-    const { data, err } = await supabase.from('Team').select()
-    if (err) {
-      console.error('Error fetching data:', err)
-      error.value = err.message
-    } else {
-      console.log('Fetched data:', data)
-      todos.value = data
-      error.value = null
+  setup() {
+    const { initAuth, isAuthenticated, user } = useAuth()
+    const authInitialized = ref(false)
+    
+    onMounted(async () => {
+      console.log('App mounted, initializing authentication state')
+      try {
+        // Initialize authentication state on app mount
+        await initAuth()
+        authInitialized.value = true
+        console.log('Authentication initialized successfully')
+        console.log('Auth state:', { isAuthenticated: isAuthenticated.value, user: user.value })
+      } catch (error) {
+        console.error('Error initializing authentication:', error)
+      }
+    })
+    
+    return {
+      authInitialized,
+      isAuthenticated,
+      user
     }
-  } catch (e) {
-    console.error('Unexpected error:', e)
-    error.value = e.message
   }
 }
-
-onMounted(() => {
-  getTodos()
-})
 </script>
 
 <style>

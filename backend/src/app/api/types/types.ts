@@ -1,3 +1,5 @@
+"use client";
+
 import { z } from "zod";
 
 // Enum for Role
@@ -9,7 +11,7 @@ export const UserSchema = z.object({
   id: z.string().optional(),
   email: z.string().email(),
   password: z.string(),
-  displayName: z.string().min(2).max(50),
+  displayName: z.string().min(2, "Display name must be at least 2 characters long").max(50),
   role: RoleEnum.default("Player"),
   managerId: z.string().optional(),
   playerId: z.string().optional(),

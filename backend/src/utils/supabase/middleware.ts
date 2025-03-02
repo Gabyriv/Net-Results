@@ -1,9 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { type NextRequest, NextResponse } from "next/server";
+import { parse } from 'cookie';
 
 export const updateSession = async (request: NextRequest) => {
-  // This `try/catch` block is only here for the interactive tutorial.
-  // Feel free to remove once you have Supabase connected.
   try {
     // Create an unmodified response
     let response = NextResponse.next({
@@ -12,47 +11,59 @@ export const updateSession = async (request: NextRequest) => {
       },
     });
 
-    const supabase = createServerClient(
+    // Create Supabase client
+    const supabase = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value),
-            );
-            response = NextResponse.next({
-              request,
-            });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options),
-            );
-          },
-        },
-      },
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+        }
+      }
     );
-
-    // This will refresh session if expired - required for Server Components
-    // https://supabase.com/docs/guides/auth/server-side/nextjs
-    const user = await supabase.auth.getUser();
-
-    // protected routes
-    if (request.nextUrl.pathname.startsWith("/protected") && user.error) {
-      return NextResponse.redirect(new URL("/sign-in", request.url));
+    
+    // Get token from cookies if available
+    let token = null;
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      const cookies = parse(cookieHeader);
+      token = cookies.auth_token;
+    }
+    
+    // If no token in cookies, try Authorization header
+    if (!token) {
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
     }
 
-    if (request.nextUrl.pathname === "/" && !user.error) {
-      return NextResponse.redirect(new URL("/protected", request.url));
+    // Get user information if token is available
+    let user = null;
+    if (token) {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (!error) {
+        user = data.user;
+      } else {
+        console.error('Error getting user from token:', error);
+      }
+    } else {
+      // Try to get session without token
+      const { data, error } = await supabase.auth.getSession();
+      if (!error && data.session) {
+        user = data.session.user;
+      }
+    }
+
+    // Handle protected routes (customize as needed for your app)
+    if (request.nextUrl.pathname.startsWith("/api/protected") && !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     return response;
-  } catch (e) {
-    // If you are here, a Supabase client could not be created!
-    // This is likely because you have not set up environment variables.
-    // Check out http://localhost:3000 for Next Steps.
+  } catch (error) {
+    console.error('Error in updateSession middleware:', error);
     return NextResponse.next({
       request: {
         headers: request.headers,

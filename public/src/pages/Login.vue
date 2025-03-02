@@ -29,8 +29,11 @@
           Login
         </button>
       </form>
-      <div v-if="errorMessage" class="mt-6 text-red-500 text-center">
+      <div v-if="errorMessage && errorMessage.length > 0" class="mt-6 text-red-500 text-center">
         {{ errorMessage }}
+      </div>
+      <div v-if="loading" class="mt-6 text-blue-500 text-center">
+        Processing your request...
       </div>
       <div class="mt-6 text-center">
         <router-link to="/register" class="text-blue-600 hover:underline">Don't have an account? Register</router-link>
@@ -43,33 +46,70 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useAuth } from '../composable/useAuth'
+import { useRoute, useRouter } from 'vue-router'
 
 export default {
   name: 'Login',
   setup() {
     const email = ref('')
     const password = ref('')
-    const errorMessage = ref('')
+    const localError = ref('')
+    const route = useRoute()
+    const router = useRouter()
+    
+    // Use the auth composable
+    const { login: authLogin, authError, loading, isAuthenticated } = useAuth()
+
+    // Check if we have a redirect URL from the route query
+    onMounted(() => {
+      console.log('Login component mounted')
+      if (isAuthenticated.value) {
+        console.log('User is already authenticated, redirecting to dashboard')
+        router.push('/dashboard')
+      }
+    })
 
     const login = async () => {
+      localError.value = ''
+      
+      if (!email.value || !password.value) {
+        localError.value = 'Please enter both email and password'
+        return
+      }
+      
+      console.log('Login.vue: Attempting to log in with:', email.value)
+      
       try {
-        if (!email.value || !password.value) {
-          errorMessage.value = 'Please fill in all fields.'
-          return
+        const result = await authLogin({
+          email: email.value,
+          password: password.value
+        })
+        
+        console.log('Login.vue: Login result:', result)
+        
+        if (result.success) {
+          console.log('Login.vue: Login successful, checking for redirect')
+          // Check if we need to redirect to a specific page
+          const redirectPath = route.query.redirect || '/dashboard'
+          console.log('Login.vue: Redirecting to:', redirectPath)
+          router.push(redirectPath)
+        } else {
+          console.error('Login.vue: Login failed:', result.error)
+          localError.value = result.error || 'Login failed. Please try again.'
         }
-        console.log('Logging in with', email.value, password.value)
-        // Example: await axios.post('/api/login', { email: email.value, password: password.value })
-        // On success, redirect the user or update your auth state.
       } catch (error) {
-        errorMessage.value = 'Login failed. Please check your credentials and try again.'
+        console.error('Login.vue: Exception during login:', error)
+        localError.value = 'An unexpected error occurred. Please try again.'
       }
     }
 
     return {
       email,
       password,
-      errorMessage,
+      errorMessage: computed(() => localError.value || authError.value),
+      loading,
       login,
     }
   },

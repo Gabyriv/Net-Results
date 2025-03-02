@@ -1,3 +1,5 @@
+"use client";
+
 import { NextResponse } from "next/server"
 import { ZodError, ZodIssue } from "zod"
 import { Prisma } from "@prisma/client"
