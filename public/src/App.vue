@@ -1,6 +1,15 @@
 <template>
   <div>
-    <router-view></router-view> <!-- This will render the current route component -->
+    <router-view v-slot="{ Component }">
+      <transition 
+        name="fade" 
+        mode="out-in"
+        @before-leave="beforeLeave"
+        @enter="enter"
+      >
+        <component :is="Component" />
+      </transition>
+    </router-view>
   </div>
 </template>
 
@@ -27,15 +36,48 @@ export default {
       }
     })
     
+    // Transition methods
+    const beforeLeave = (el) => {
+      // Ensure the scroll position is reset when navigating
+      window.scrollTo(0, 0)
+    }
+    
+    const enter = (el, done) => {
+      // Force a repaint to make the transition smoother
+      el.offsetHeight
+      done()
+    }
+    
     return {
       authInitialized,
       isAuthenticated,
-      user
+      user,
+      beforeLeave,
+      enter
     }
   }
 }
 </script>
 
 <style>
-/* Global styles can also go here, though Tailwind is imported via tailwind.css */
+/* Transition styles */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Ensure content doesn't jump during transitions */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prevent FOUC (Flash of Unstyled Content) */
+.router-link-active {
+  font-weight: bold;
+}
 </style>

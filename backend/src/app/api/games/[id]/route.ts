@@ -6,7 +6,7 @@ import { withAuth } from "@/utils/auth-utils";
 
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-    return withAuth(request, async (session) => {
+    return withAuth(request, async () => {
         try {
             const game = await prisma.game.findUnique({
                 where: { id: params.id },
@@ -179,33 +179,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     });
 }
 
-/**
- * @swagger
- * /api/games/{id}:
- *   delete:
- *     summary: Delete a game
- *     description: Deletes a game and updates team stats
- *     tags:
- *       - Games
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Game ID
- *     responses:
- *       200:
- *         description: Game deleted successfully
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Not team owner or admin
- *       404:
- *         description: Game not found
- */
+
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
     return withAuth(async (session) => {
         try {

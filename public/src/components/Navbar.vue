@@ -5,26 +5,29 @@
     </router-link>
     
     <!-- Navigation for authenticated users -->
-    <ul v-if="isAuthenticated" class="flex space-x-10">
-      <li>
-        <router-link to="/dashboard" class="text-lg text-white hover:text-gray-200 transition duration-300">Dashboard</router-link>
-      </li>
-      <li>
-        <router-link to="/players" class="text-lg text-white hover:text-gray-200 transition duration-300">Teams</router-link>
-      </li>
-      <li>
-        <router-link to="/matches" class="text-lg text-white hover:text-gray-200 transition duration-300">Matches</router-link>
-      </li>
-      <li>
-        <router-link to="/statistics" class="text-lg text-white hover:text-gray-200 transition duration-300">Statistics</router-link>
-      </li>
-      <li>
-        <a href="#" @click.prevent="logout" class="text-lg text-white hover:text-gray-200 transition duration-300">Logout</a>
-      </li>
-      <li v-if="user" class="text-lg text-yellow-200">
-        {{ user.displayName || user.email }}
-      </li>
-    </ul>
+    <div v-if="isAuthenticated" class="flex items-center space-x-10">
+      <ul class="flex space-x-10">
+        <li>
+          <router-link to="/dashboard" class="text-lg text-white hover:text-gray-200 transition duration-300">Dashboard</router-link>
+        </li>
+        <li>
+          <router-link to="/teams" class="text-lg text-white hover:text-gray-200 transition duration-300">Teams</router-link>
+        </li>
+        <li>
+          <router-link to="/api-connection" class="text-lg text-white hover:text-gray-200 transition duration-300">API Test</router-link>
+        </li>
+        <li v-if="user" class="text-lg text-yellow-200">
+          {{ user.displayName }}
+        </li>
+      </ul>
+      <button 
+        @click="handleLogout" 
+        class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-300"
+        :disabled="loading"
+      >
+        {{ loading ? 'Logging out...' : 'Logout' }}
+      </button>
+    </div>
     
     <!-- Navigation for guests -->
     <ul v-else class="flex space-x-10">
@@ -34,22 +37,39 @@
       <li>
         <router-link to="/register" class="text-lg text-white hover:text-gray-200 transition duration-300">Register</router-link>
       </li>
+      <li>
+        <router-link to="/api-connection" class="text-lg text-white hover:text-gray-200 transition duration-300">API Test</router-link>
+      </li>
     </ul>
   </nav>
 </template>
 
 <script>
 import { useAuth } from '../composable/useAuth';
+import { ref } from 'vue';
 
 export default {
   name: "Navbar",
   setup() {
     const { user, isAuthenticated, logout } = useAuth();
+    const loading = ref(false);
+    
+    const handleLogout = async () => {
+      try {
+        loading.value = true;
+        await logout();
+      } catch (error) {
+        console.error('Error during logout:', error);
+      } finally {
+        loading.value = false;
+      }
+    };
     
     return {
       user,
       isAuthenticated,
-      logout
+      loading,
+      handleLogout
     };
   }
 };

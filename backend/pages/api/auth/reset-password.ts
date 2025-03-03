@@ -51,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Create Supabase client
-    const supabase = await createClient();
+    const supabase = await createClient(null);
     
     // Development approach for password reset
     // First, send a password reset email
@@ -72,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // For development convenience, we'll also try to update the password directly
     // This is a workaround that may or may not work depending on Supabase configuration
     console.log(`[DEV ONLY] Attempting to sign in with OTP for ${validated.email}`);
-    const { data: otpData, error: otpError } = await supabase.auth.signInWithOtp({
+    const { error: otpError } = await supabase.auth.signInWithOtp({
       email: validated.email,
     });
     

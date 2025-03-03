@@ -5,7 +5,7 @@ import { logger } from '@/utils/logger';
 
 type ResponseData = {
     valid?: boolean;
-    user?: any;
+    user?: Record<string, unknown>;
     error?: string;
 };
 
@@ -31,20 +31,28 @@ export default async function handler(
         }
 
         // Create Supabase client
-        const supabase = createClient();
+        const supabase = await createClient(token);
         
-        // Validate token by getting the user
-        const { data, error } = await supabase.auth.getUser(token);
+        // Set session manually using the token
+        const { data: { user }, error } = await supabase.auth.getUser(token);
         
-        if (error || !data.user) {
-            logger.warn('Invalid token', { error: error?.message });
+        if (error) {
+            console.error('Error getting user:', error);
+            logger.warn('Error getting user from Supabase', { error: error.message });
+            return res.status(401).json({ valid: false, error: 'Invalid token' });
+        }
+        
+        if (error || !user) {
+            logger.warn('Invalid token', { 
+                errorMessage: error ? String(error) : undefined 
+            });
             return res.status(401).json({ valid: false, error: 'Invalid token' });
         }
 
         // Get user data from database to include role
         const { prisma } = await import("@/config/prisma");
-        const user = await prisma.user.findUnique({
-            where: { email: data.user.email },
+        const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
             select: {
                 id: true,
                 email: true,
@@ -53,28 +61,28 @@ export default async function handler(
             }
         });
 
-        if (!user) {
+        if (!dbUser) {
             logger.warn('User found in auth but not in database', { 
-                email: data.user.email 
+                email: user.email 
             });
             return res.status(401).json({ valid: false, error: 'User account incomplete' });
         }
 
         // Merge user data with auth data
         const enrichedUser = {
-            ...data.user,
-            role: user.role,
-            displayName: user.displayName,
+            ...user,
+            role: dbUser.role,
+            displayName: dbUser.displayName,
             user_metadata: {
-                ...data.user.user_metadata,
-                role: user.role,
-                displayName: user.displayName
+                ...user.user_metadata,
+                role: dbUser.role,
+                displayName: dbUser.displayName
             }
         };
 
         logger.info('Token validation successful', { 
-            userId: user.id,
-            role: user.role
+            userId: dbUser.id,
+            role: dbUser.role
         });
 
         return res.status(200).json({ valid: true, user: enrichedUser });

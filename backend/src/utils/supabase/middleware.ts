@@ -5,7 +5,7 @@ import { parse } from 'cookie';
 export const updateSession = async (request: NextRequest) => {
   try {
     // Create an unmodified response
-    let response = NextResponse.next({
+    const response = NextResponse.next({
       request: {
         headers: request.headers,
       },

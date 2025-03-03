@@ -15,8 +15,8 @@ type ResponseData = {
     error?: string;
     code?: string;
     data?: {
-        session: any;
-        user: any;
+        session: Record<string, unknown>;
+        user: Record<string, unknown>;
     };
 };
 
@@ -96,25 +96,26 @@ export default async function handler(
                             return res.status(401).json({ 
                                 error: 'Email not confirmed', 
                                 code: 'email_not_confirmed',
-                                message: 'Your email is not confirmed. In development mode, you can use the /api/auth/confirm-email endpoint to manually confirm your email.',
-                                devHelper: {
-                                    endpoint: '/api/auth/confirm-email',
-                                    method: 'POST',
-                                    body: { email: validated.email }
+                                data: {
+                                    session: { 
+                                        endpoint: '/api/auth/confirm-email',
+                                        method: 'POST'
+                                    },
+                                    user: { 
+                                        email: validated.email 
+                                    }
                                 }
                             });
                         } else {
                             return res.status(401).json({ 
-                                error: 'Email not confirmed', 
-                                code: 'email_not_confirmed',
-                                message: 'Please check your email to confirm your account before logging in.'
+                                error: 'Please check your email to confirm your account before logging in.',
+                                code: 'email_not_confirmed'
                             });
                         }
                     } else if (authError.message === 'Invalid login credentials') {
                         return res.status(401).json({ 
-                            error: 'Invalid login credentials', 
-                            code: 'invalid_credentials',
-                            message: 'The email or password you entered is incorrect.'
+                            error: 'The email or password you entered is incorrect.',
+                            code: 'invalid_credentials'
                         });
                     }
                 }
@@ -122,8 +123,7 @@ export default async function handler(
                 // Generic error response for other cases
                 return res.status(401).json({ 
                     error: 'Authentication failed', 
-                    code: 'auth_failed',
-                    message: authError?.message || 'Unable to authenticate'
+                    code: 'auth_failed'
                 });
             }
             
@@ -160,29 +160,30 @@ export default async function handler(
                 role: user.role
             });
             
-            // Create session with user metadata
-            const session = {
-                ...authData.session,
-                user: {
-                    ...authData.session.user,
-                    role: user.role,
-                    user_metadata: {
-                        ...authData.session.user.user_metadata,
-                        role: user.role,
-                        displayName: user.displayName
-                    }
-                }
-            };
+            // Create session with user metadata - commented out as it's not currently used
+            // const session = {
+            //     ...authData.session,
+            //     user: {
+            //         ...authData.session.user,
+            //         role: user.role,
+            //         user_metadata: {
+            //             ...authData.session.user.user_metadata,
+            //             role: user.role,
+            //             displayName: user.displayName
+            //         }
+            //     }
+            // };
             
             // Prepare successful login response
             console.log('Preparing successful login response');
-            const responseData = { 
-                success: true, 
-                data: { 
-                    session, 
-                    user: session.user
-                } 
-            };
+            // Commented out as it's not currently used
+            // const responseData = { 
+            //     success: true, 
+            //     data: { 
+            //         session, 
+            //         user: session.user
+            //     } 
+            // };
             console.log('Response data prepared');
             
             // Set auth cookies
@@ -232,7 +233,7 @@ function handleServerError(error: unknown, res: NextApiResponse) {
 
     // Handle Prisma errors
     if (error instanceof Error && error.name === 'PrismaClientKnownRequestError') {
-        const prismaError = error as any;
+        const prismaError = error as unknown as { code: string; message: string };
         switch (prismaError.code) {
             case 'P2002':
                 return res.status(409).json({ error: 'Email already exists' });

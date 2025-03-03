@@ -136,7 +136,7 @@ export async function withAuth<T>(
         userId: string, 
         userEmail: string, 
         userRole: string, 
-        userMetadata: any 
+        userMetadata: Record<string, unknown> 
     }) => Promise<T>,
     requiredRole?: Role
 ): Promise<T | NextResponse> {

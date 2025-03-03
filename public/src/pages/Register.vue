@@ -4,6 +4,16 @@
       <h2 class="text-5xl font-bold mb-15 text-center">Register</h2>
       <form @submit.prevent="register">
         <div class="mb-6">
+          <label class="block text-gray-700" for="displayName">Name</label>
+          <input
+            v-model="displayName"
+            type="text"
+            id="displayName"
+            class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-blue-500"
+            placeholder="Enter your display name"
+          />
+        </div>
+        <div class="mb-6">
           <label class="block text-gray-700" for="email">Email</label>
           <input
             v-model="email"
@@ -36,15 +46,28 @@
             required
           />
         </div>
-        <div class="mb-8">
-          <label class="block text-gray-700" for="displayName">Display Name</label>
-          <input
-            v-model="displayName"
-            type="text"
-            id="displayName"
-            class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-blue-500"
-            placeholder="Enter your display name (optional)"
-          />
+        <div class="mb-6">
+          <label class="block text-gray-700 mb-2">Role</label>
+          <div class="flex space-x-4">
+            <label class="inline-flex items-center">
+              <input 
+                type="radio" 
+                v-model="role" 
+                value="Player" 
+                class="form-radio h-5 w-5 text-blue-600"
+              />
+              <span class="ml-2 text-gray-700">Player</span>
+            </label>
+            <label class="inline-flex items-center">
+              <input 
+                type="radio" 
+                v-model="role" 
+                value="Manager" 
+                class="form-radio h-5 w-5 text-blue-600"
+              />
+              <span class="ml-2 text-gray-700">Manager</span>
+            </label>
+          </div>
         </div>
         <button 
           type="submit" 
@@ -82,6 +105,7 @@ export default {
     const password = ref('')
     const confirmPassword = ref('')
     const displayName = ref('')
+    const role = ref('Player') // Default to Player
     const localError = ref('')
 
     // Use the auth composable
@@ -106,7 +130,7 @@ export default {
         email: email.value,
         password: password.value,
         displayName: displayName.value || email.value.split('@')[0],
-        role: 'Player' // Default role
+        role: role.value
       })
     }
 
@@ -115,6 +139,7 @@ export default {
       password,
       confirmPassword,
       displayName,
+      role,
       errorMessage: computed(() => localError.value || authError.value),
       loading,
       register,

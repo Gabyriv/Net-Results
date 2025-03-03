@@ -21,7 +21,7 @@ export default async function handler(
 
     try {
         // Create Supabase client
-        const supabase = createClient();
+        const supabase = await createClient(null);
         
         // Sign out the user
         const { error } = await supabase.auth.signOut();
@@ -31,8 +31,20 @@ export default async function handler(
             return res.status(500).json({ error: 'Failed to logout' });
         }
 
-        // Clear the auth token cookie
-        res.setHeader('Set-Cookie', 'auth_token=; HttpOnly; Path=/; Max-Age=0');
+        // Clear all auth-related cookies
+        const cookiesToClear = [
+            'auth_token',
+            'sb-access-token',
+            'sb-refresh-token'
+        ];
+
+        cookiesToClear.forEach(cookieName => {
+            res.setHeader('Set-Cookie', [
+                `${cookieName}=; Path=/; Max-Age=0`,
+                `${cookieName}=; Path=/; Domain=localhost; Max-Age=0`,
+                `${cookieName}=; Path=/api; Max-Age=0`
+            ]);
+        });
         
         logger.info('Logout successful');
         return res.status(200).json({ success: true });

@@ -45,8 +45,8 @@ model Player {
   id          String       @id @unique
   displayName String
   gamesPlayed Int
-  team        Team         @relation(fields: [teamId], references: [id])
-  teamId      String
+  team        Team?        @relation(fields: [teamId], references: [id])
+  teamId      String?
   user        User         @relation(fields: [userId], references: [id])
   userId      String       @unique
   playerStats PlayerStat[]

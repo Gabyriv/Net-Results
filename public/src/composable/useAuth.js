@@ -8,11 +8,12 @@ const isAuthenticated = computed(() => !!user.value)
 const authError = ref(null)
 const loading = ref(false)
 
-// API base URL
-const API_URL = 'http://localhost:3000/api'
+// API base URL - use environment variable or default to '/api'
+const API_URL = '/api'
 
 // Configure axios defaults
 axios.defaults.withCredentials = true
+axios.defaults.headers.common['Content-Type'] = 'application/json'
 
 export function useAuth() {
   const router = useRouter()
@@ -81,12 +82,16 @@ export function useAuth() {
     }
   }
 
-  // Set auth token in axios headers
+  // Set auth token in axios headers and cookies
   const setAuthHeader = (token) => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      // Ensure cookie is set with proper attributes
+      document.cookie = `auth_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; ${location.protocol === 'https:' ? 'secure;' : ''} samesite=strict`
     } else {
       delete axios.defaults.headers.common['Authorization']
+      // Clear the auth cookie
+      document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;'
     }
   }
 
@@ -215,23 +220,45 @@ export function useAuth() {
 
   // Logout user
   const logout = async () => {
+    loading.value = true
     try {
+      console.log('Logging out user')
+      
       // Call logout endpoint
       await axios.post(`${API_URL}/auth/logout`, {}, {
-        withCredentials: true
+        withCredentials: true,
+        headers: {
+          'Authorization': `Bearer ${user.value?.token || ''}`
+        }
       })
+      
+      console.log('Logout API call successful')
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('Logout API error:', error)
     } finally {
-      // Clear user data regardless of API response
+      // Clear all auth-related cookies
+      const cookiesToClear = ['auth_token', 'sb-access-token', 'sb-refresh-token']
+      cookiesToClear.forEach(cookieName => {
+        document.cookie = `${cookieName}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+        document.cookie = `${cookieName}=; path=/api; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+      })
+      
+      // Clear user data
       user.value = null
       localStorage.removeItem('user')
-      setAuthHeader(null)
       
-      // Clear the auth token cookie
-      document.cookie = 'auth_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      // Clear auth headers
+      delete axios.defaults.headers.common['Authorization']
       
-      router.push('/login')
+      // Reset any error state
+      authError.value = null
+      
+      console.log('Local auth state cleared')
+      
+      // Navigate to login page using router.replace to avoid history issues
+      router.replace('/login')
+      
+      loading.value = false
     }
   }
 
@@ -264,13 +291,27 @@ export function useAuth() {
       })
       
       console.log('Token validation response:', response.status)
-      return response.data && response.data.valid
+      
+      // Update user data if validation was successful
+      if (response.data?.valid && response.data?.user) {
+        user.value = {
+          ...user.value,
+          ...response.data.user,
+          token // Keep the existing token
+        }
+        localStorage.setItem('user', JSON.stringify(user.value))
+      }
+      
+      return response.data?.valid || false
     } catch (error) {
       console.error('Token validation error:', error)
       if (error.response) {
         console.error('Response status:', error.response.status)
         if (error.response.status === 401) {
-          // Token is invalid
+          // Token is invalid, clear user data
+          user.value = null
+          localStorage.removeItem('user')
+          setAuthHeader(null)
           return false
         }
       }
@@ -280,6 +321,16 @@ export function useAuth() {
       console.warn('Could not validate token due to error, assuming valid for now')
       return true
     }
+  }
+
+  // Get authorization header for API requests
+  const getAuthHeader = () => {
+    if (user.value && user.value.token) {
+      return {
+        Authorization: `Bearer ${user.value.token}`
+      }
+    }
+    return {}
   }
 
   return {
@@ -292,6 +343,7 @@ export function useAuth() {
     logout,
     initAuth,
     hasRole,
-    validateToken
+    validateToken,
+    getAuthHeader
   }
 }

@@ -3,9 +3,9 @@ import { prisma } from "@/config/prisma";
 import bcrypt from "bcryptjs";
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import crypto from 'crypto';
 import { checkRole } from '@/utils/auth-utils';
 import { createClient } from '@/utils/supabase/server';
+import { Role } from '@prisma/client';
 
 
 // User schema for validation
@@ -29,8 +29,8 @@ type ResponseData = {
   success?: boolean;
   error?: string;
   code?: string;
-  details?: any;
-  data?: any;
+  details?: Record<string, unknown>;
+  data?: Record<string, unknown>;
   message?: string;
 };
 
@@ -62,7 +62,7 @@ export default async function handler(
           // First, create the user in Supabase Auth
           console.log('Creating user in Supabase Auth');
           // Create regular client for signup
-          const supabase = await createClient();
+          const supabase = await createClient(null);
           
           // Create admin client for email confirmation
           const adminClient = await createClient(undefined, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -112,7 +112,17 @@ export default async function handler(
             
             // Create the user in Supabase Auth with the appropriate options
             console.log('Signing up user with options:', JSON.stringify(signUpOptions, null, 2));
-            const { data: authData, error: authError } = await supabase.auth.signUp(signUpOptions);
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+              email: validated.email,
+              password: validated.password,
+              options: {
+                data: {
+                  displayName: validated.displayName,
+                  role: validated.role || 'Player'
+                },
+                emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
+              }
+            });
             
             if (authError) {
               console.error('Error signing up user:', authError.message);
@@ -123,6 +133,53 @@ export default async function handler(
             }
             
             console.log('Auth signup response:', JSON.stringify(authData, null, 2));
+
+            // Create the user in Prisma
+            if (authData?.user) {
+              try {
+                // Create user in Prisma
+                const prismaUser = await prisma.user.create({
+                  data: {
+                    id: authData.user.id,
+                    email: validated.email,
+                    password: await bcrypt.hash(validated.password, 10),
+                    displayName: validated.displayName,
+                    role: validated.role as Role
+                  }
+                });
+
+                // If user is a Manager, create manager record
+                if (validated.role === 'Manager') {
+                  await prisma.manager.create({
+                    data: {
+                      id: `mgr_${Date.now()}`,
+                      displayName: validated.displayName,
+                      userId: prismaUser.id
+                    }
+                  });
+                }
+
+                // If user is a Player, create player record
+                if (validated.role === 'Player') {
+                  await prisma.player.create({
+                    data: {
+                      id: `plr_${Date.now()}`,
+                      displayName: validated.displayName,
+                      gamesPlayed: 0,
+                      userId: prismaUser.id
+                    }
+                  });
+                }
+              } catch (prismaError) {
+                console.error('Error creating user in Prisma:', prismaError);
+                // If Prisma creation fails, delete the Supabase user
+                await adminClient.auth.admin.deleteUser(authData.user.id);
+                return res.status(500).json({
+                  error: 'Failed to create user record',
+                  details: { message: prismaError instanceof Error ? prismaError.message : 'Unknown error' }
+                });
+              }
+            }
             
             // For development, we'll attempt to automatically confirm the email
             if (isDevelopment && authData?.user) {
@@ -131,14 +188,8 @@ export default async function handler(
                 // Wait a short moment for the user to be fully created
                 await new Promise(resolve => setTimeout(resolve, 1000));
 
-                // Use the confirm-email endpoint instead of direct admin API
-                console.log('Calling confirm-email endpoint');
-                
-                // Create a simple fetch function for internal API call
-                const fetch = (await import('node-fetch')).default;
-                
-                // Call the confirm-email endpoint
-                const confirmResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auth/confirm-email`, {
+                // Use the built-in fetch API instead of node-fetch
+                const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auth/confirm-email`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -149,9 +200,9 @@ export default async function handler(
                   })
                 });
                 
-                const confirmResult = await confirmResponse.json();
+                const confirmResult = await response.json();
                 
-                if (!confirmResponse.ok) {
+                if (!response.ok) {
                   console.warn('Email confirmation failed:', confirmResult.error);
                   throw new Error(confirmResult.message || 'Email confirmation failed');
                 }
@@ -184,30 +235,35 @@ export default async function handler(
               console.error('Error creating user in Supabase Auth:', authError);
               
               // Handle specific Supabase auth errors with appropriate status codes
-              if (authError.status === 400) {
-                if (authError.code === 'email_address_invalid') {
-                  return res.status(400).json({
-                    error: 'Invalid email address format',
-                    details: 'Please provide a valid email address'
-                  });
-                } else if (authError.code === 'user_already_exists') {
-                  return res.status(409).json({
-                    error: 'Email already exists',
-                    details: 'This email is already registered'
-                  });
-                } else if (authError.code === 'weak_password') {
-                  return res.status(400).json({
-                    error: 'Password too weak',
-                    details: 'Please provide a stronger password'
-                  });
+              if (authError && typeof authError === 'object' && 'status' in authError) {
+                const typedError = authError as { status: number; code?: string; message?: string };
+                
+                if (typedError.status === 400) {
+                  if (typedError.code === 'email_address_invalid') {
+                    return res.status(400).json({
+                      error: 'Invalid email address format',
+                      details: { message: 'Please provide a valid email address' }
+                    });
+                  } else if (typedError.code === 'user_already_exists') {
+                    return res.status(409).json({
+                      error: 'Email already exists',
+                      details: { message: 'This email is already registered' }
+                    });
+                  } else if ('code' in typedError && typedError.code === 'weak_password') {
+                    return res.status(400).json({
+                      error: 'Password too weak',
+                      details: { message: 'Please provide a stronger password' }
+                    });
+                  }
                 }
               }
               
               // Generic error for other cases
-              return res.status(authError.status || 500).json({
+              return res.status(500).json({
                 error: 'Error creating user in authentication system',
-                details: authError.message,
-                code: authError.code
+                details: { message: typeof authError === 'object' && authError !== null ? 
+                  ('message' in authError ? String((authError as any).message) : String(authError)) : 
+                  String(authError) }
               });
             }
             
@@ -215,7 +271,7 @@ export default async function handler(
               console.error('No user returned from Supabase Auth');
               return res.status(500).json({
                 error: 'Error creating user in authentication system',
-                details: 'No user data returned'
+                details: { message: 'No user data returned' }
               });
             }
           
@@ -234,7 +290,7 @@ export default async function handler(
                 id: userId,
                 email: validated.email,
                 displayName: validated.displayName,
-                role: role,
+                role: role as Role,
                 password: 'SUPABASE_MANAGED' // This is just a placeholder since Supabase manages passwords
               },
               select: {
@@ -288,8 +344,7 @@ export default async function handler(
           return res.status(201).json({ 
             success: true, 
             data: user,
-            message: responseMessage,
-            requiresEmailVerification: process.env.NODE_ENV === 'production'
+            message: responseMessage
           });
         } catch (prismaError) {
           console.error('Error creating user in Prisma:', prismaError);
@@ -322,7 +377,10 @@ export default async function handler(
         }
       });
       
-      return res.status(200).json({ success: true, data: users });
+      return res.status(200).json({ 
+        success: true, 
+        data: { users } 
+      });
     } catch (error) {
       return handleServerError(error, res);
     }
@@ -342,7 +400,7 @@ function handleServerError(error: unknown, res: NextApiResponse) {
 
   // Handle Prisma errors
   if (error instanceof Error && error.name === 'PrismaClientKnownRequestError') {
-    const prismaError = error as any;
+    const prismaError = error as unknown as { code: string; message: string };
     switch (prismaError.code) {
       case 'P2002':
         return res.status(409).json({ error: 'Email already exists' });

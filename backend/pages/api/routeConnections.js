@@ -21,6 +21,10 @@ export default async function handler(req, res) {
   // Run the middleware
   await runMiddleware(req, res, cors);
 
-  // Rest of the API logic
-  res.status(200).json({ message: 'DOHFOSDF:OKSDJFLSDKFJSLKDFJSLDKJFOEWHFLDKJS' });
+  // Return a meaningful response
+  res.status(200).json({ 
+    message: 'Connection to backend API successful!',
+    status: 'online',
+    timestamp: new Date().toISOString()
+  });
 }

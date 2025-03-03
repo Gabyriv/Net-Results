@@ -1,7 +1,7 @@
 // Custom Next.js server with environment validation and production enhancements
-const { createServer } = 'http';
-const { parse } = 'url';
-const next = 'next';
+const { createServer } = require('http');
+const { parse } = require('url');
+const next = require('next');
 
 // Determine the environment
 const dev = process.env.NODE_ENV !== 'production';

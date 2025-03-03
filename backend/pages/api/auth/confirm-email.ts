@@ -2,7 +2,6 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@/utils/supabase/server';
 import { z } from 'zod';
 import { logger } from '@/utils/logger';
-import { devBypassEmailConfirmation } from '@/utils/dev-helpers';
 
 // Validation schema for email confirmation
 const confirmEmailSchema = z.object({
@@ -86,14 +85,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
     
-    // Update the user to confirm their email and set a new password
-    console.log('Updating user to confirm email and reset password');
+    // Update the user to confirm their email
+    console.log('Updating user to confirm email');
     const { error: updateError } = await supabase.auth.admin.updateUserById(
       user.id,
-      { 
-        email_confirmed: true,
-        password: bodyToParse.password || '1234567890' // Use provided password or default
-      }
+      { email_confirm: true }
     );
     
     if (updateError) {
@@ -107,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Try to sign in the user to verify everything works
     console.log('Testing login with updated credentials');
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email: validated.email,
       password: bodyToParse.password || '1234567890'
     });

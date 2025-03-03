@@ -8,6 +8,8 @@
 </template>
 
 <script>
+import axios from 'axios'
+
 export default {
   name: 'FetchApi',
   data() {
@@ -22,17 +24,10 @@ export default {
   methods: {
     fetchBackendMessage() {
       console.log('Fetching data from backend...')
-      fetch('http://localhost:3000/api/routeConnections')
+      axios.get('/api/routeConnections')
         .then(response => {
           console.log('Response:', response)
-          if (!response.ok) {
-            throw new Error(`Network response was not ok: ${response.status}`)
-          }
-          return response.json()
-        })
-        .then(data => {
-          console.log('Data received:', data)
-          this.message = data.message
+          this.message = response.data.message
         })
         .catch(error => {
           console.error('Error fetching data:', error)

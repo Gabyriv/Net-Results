@@ -105,6 +105,7 @@ export async function GET() {
     // Return detailed response in development, simplified in production
     if (environment === 'production') {
       // In production, don't expose detailed system information
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { system, checks, ...productionResponse } = healthStatus;
       return NextResponse.json(productionResponse, { 
         status: overallStatus === "error" ? 503 : 200,
@@ -194,7 +195,7 @@ async function checkAuthService(checks: HealthStatus["checks"]): Promise<boolean
     );
     
     // Check if auth service is available
-    const { data, error } = await supabase.auth.getSession();
+    const { error } = await supabase.auth.getSession();
     
     const latency = Date.now() - startTime;
     
