@@ -105,7 +105,7 @@ export async function POST(
                     }
                 }
             });
-            
+
             return NextResponse.json({
                 success: true,
                 data: updatedTeam,
@@ -118,4 +118,4 @@ export async function POST(
             return handleServerError(error);
         }
     });
-} 
+}

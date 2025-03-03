@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prismaClient } from "../../../config/prisma-server";
 import { handleServerError } from "../errors_handlers/server-errors";
 import { withAuth } from "../../../utils/auth-utils";
-import { PrismaClient } from "@prisma/client";
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET(request: Request) {
@@ -89,7 +88,7 @@ export async function POST(request: Request) {
                     displayName: displayName.trim(),
                     gamesPlayed: 0,
                     ...(jerseyNumber ? { number: parseInt(jerseyNumber) } : {}),
-                    teamId: teamId || null,
+                    teamId: teamId,
                     user: {
                         create: {
                             id: newUserId,
