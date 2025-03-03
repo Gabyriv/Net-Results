@@ -36,7 +36,7 @@
           </div>
           <form @submit.prevent="handleUpdateTeam" class="space-y-4">
             <div>
-              <label for="teamName" class="block text-sm font-medium text-gray-700">Team Name</label>
+              <label for="teamName" class="block text-lg font-medium text-gray-700">Team Name</label>
               <input 
                 type="text" 
                 id="teamName" 
@@ -49,11 +49,11 @@
             <!-- Player Management Section -->
             <div>
               <div class="flex justify-between items-center mb-2">
-                <label class="block text-sm font-medium text-gray-700">Add New Players</label>
+                <label class="block text-lg font-medium text-gray-700">Add New Players</label>
                 <button 
                   type="button"
                   @click="addNewPlayerToEdit"
-                  class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  class="inline-flex items-center px-3 py-1 border border-transparent text-lg leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -63,7 +63,7 @@
               </div>
               
               <!-- New Players List -->
-              <div v-if="!editingTeam.newPlayers || editingTeam.newPlayers.length === 0" class="py-3 text-sm text-gray-500 bg-gray-50 rounded-md px-3 mb-2">
+              <div v-if="!editingTeam.newPlayers || editingTeam.newPlayers.length === 0" class="py-3 text-lg text-gray-500 bg-gray-50 rounded-md px-3 mb-2">
                 No new players added. Click "Add Player" to add team members.
               </div>
               
@@ -72,7 +72,7 @@
                   <div class="flex-grow">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                       <div>
-                        <label :for="`edit-player-name-${index}`" class="block text-xs font-medium text-gray-500">Player Name</label>
+                        <label :for="`edit-player-name-${index}`" class="block text-lg font-medium text-gray-500">Player Name</label>
                         <input 
                           :id="`edit-player-name-${index}`"
                           v-model="player.displayName" 
@@ -83,7 +83,7 @@
                         />
                       </div>
                       <div>
-                        <label :for="`edit-player-number-${index}`" class="block text-xs font-medium text-gray-500">Jersey Number</label>
+                        <label :for="`edit-player-number-${index}`" class="block text-lg font-medium text-gray-500">Jersey Number</label>
                         <input 
                           :id="`edit-player-number-${index}`"
                           v-model="player.number" 
@@ -113,7 +113,7 @@
               <!-- Existing Players Selection -->
               <div v-if="showEditExistingPlayers && availablePlayers.length > 0" class="mt-4">
                 <div class="flex justify-between items-center mb-2">
-                  <label class="block text-sm font-medium text-gray-700">Manage Existing Players</label>
+                  <label class="block text-lg font-medium text-gray-700">Manage Existing Players</label>
                   <button 
                     type="button" 
                     @click="showEditExistingPlayers = false"
@@ -136,7 +136,7 @@
                     </label>
                   </div>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">{{ editingTeam.playerIds.length }} existing players selected</p>
+                <p class="mt-1 text-lg text-gray-500">{{ editingTeam.playerIds.length }} existing players selected</p>
               </div>
               
               <div v-else-if="availablePlayers.length > 0" class="mt-4">
@@ -187,12 +187,12 @@
           </div>
           <form @submit.prevent="handleCreateTeam" class="space-y-4">
             <div>
-              <label for="teamName" class="block text-sm font-medium text-gray-700">Team Name</label>
+              <label for="teamName" class="block text-lg font-medium text-gray-700">Team Name</label>
               <input 
                 type="text" 
                 id="teamName" 
                 v-model="newTeam.name" 
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
                 required
               />
             </div>
@@ -200,7 +200,7 @@
             <!-- Player Selection with Name and Number -->
             <div>
               <div class="flex justify-between items-center mb-2">
-                <label class="block text-sm font-medium text-gray-700">Team Players</label>
+                <label class="block text-lg font-medium text-gray-700">Team Players</label>
                 <button 
                   type="button"
                   @click="addNewPlayer"
@@ -214,7 +214,7 @@
               </div>
               
               <!-- Player List -->
-              <div v-if="newTeam.players.length === 0" class="py-3 text-sm text-gray-500 bg-gray-50 rounded-md px-3 mb-2">
+              <div v-if="newTeam.players.length === 0" class="py-3 text-lg text-gray-500 bg-gray-50 rounded-md px-3 mb-2">
                 No players added yet. Click "Add Player" to add team members.
               </div>
               
@@ -223,25 +223,25 @@
                   <div class="flex-grow">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                       <div>
-                        <label :for="`player-name-${index}`" class="block text-xs font-medium text-gray-500">Player Name</label>
+                        <label :for="`player-name-${index}`" class="block text-lg font-medium text-gray-500">Player Name</label>
                         <input 
                           :id="`player-name-${index}`"
                           v-model="player.name" 
                           type="text" 
-                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
                           placeholder="Enter player name"
                           required
                         />
                       </div>
                       <div>
-                        <label :for="`player-number-${index}`" class="block text-xs font-medium text-gray-500">Jersey Number</label>
+                        <label :for="`player-number-${index}`" class="block text-lg font-medium text-gray-500 text-lg">Jersey Number</label>
                         <input 
                           :id="`player-number-${index}`"
                           v-model="player.number" 
                           type="number" 
                           min="1"
                           max="99"
-                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
                           placeholder="Enter jersey number"
                           required
                         />

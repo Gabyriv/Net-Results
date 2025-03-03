@@ -1,13 +1,3 @@
-import { usePlayerStore } from '../store/playerStore'
-
-export default {
-  setup() {
-    const playerStore = usePlayerStore()
-    // Now you can use playerStore.players, playerStore.setPlayers, etc.
-    return { playerStore }
-  },
-}
-
 <template>
   <div>
     <LoadingSpinner v-if="loading" />
@@ -18,11 +8,22 @@ export default {
 </template>
 
 <script>
-import LoadingSpinner from '../components/LoadingSpinner.vue'
+import { ref } from 'vue';
+import { usePlayerStore } from '../store/playerStore';
+import LoadingSpinner from '../components/LoadingSpinner.vue';
+
 export default {
   components: { LoadingSpinner },
   setup() {
-    // your logic for loading data
+    const playerStore = usePlayerStore();
+    const loading = ref(true);
+
+    // Simulate loading data
+    setTimeout(() => {
+      loading.value = false;
+    }, 2000);
+
+    return { playerStore, loading };
   }
-}
+};
 </script>
