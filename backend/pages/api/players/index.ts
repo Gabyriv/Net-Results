@@ -44,7 +44,7 @@ export default async function handler(
                 
                 // Build the query
                 const where = unassigned === 'true' 
-                    ? { teamId: null } // Only get players without a team
+                    ? { teamId: undefined } // Only get players without a team
                     : {}; // Get all players
                 
                 const players = await prisma.player.findMany({
