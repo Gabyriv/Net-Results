@@ -36,7 +36,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-  ],
+, "src/app/api/teams/[id]/route.ts", "src/app/api/teams/route.ts"  ],
   "exclude": [
     "node_modules"
   ]

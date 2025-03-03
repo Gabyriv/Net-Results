@@ -45,7 +45,7 @@ export function useTeams() {
         },
         withCredentials: true
       })
-      teams.value = response.data
+      teams.value = response.data.data || response.data
     } catch (err) {
       console.error('Error fetching teams:', err)
       error.value = {
@@ -93,10 +93,9 @@ export function useTeams() {
         throw new Error('You must be logged in to create a team')
       }
 
+      // First, create the team
       const response = await axios.post(`${API_URL}/teams`, {
-        name: teamData.name,
-        playerIds: teamData.playerIds || [],
-        newPlayers: teamData.newPlayers || []
+        name: teamData.name
       }, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
@@ -104,9 +103,47 @@ export function useTeams() {
         withCredentials: true
       })
       
+      // Get the created team
+      const teamToAdd = response.data.data || response.data;
+      
+      // If we have players to add, make a second request
+      if ((teamData.playerIds && teamData.playerIds.length > 0) || 
+          (teamData.newPlayers && teamData.newPlayers.length > 0)) {
+        try {
+          // Map the new players to the format expected by the backend
+          const mappedNewPlayers = (teamData.newPlayers || []).map(player => ({
+            name: player.name || player.displayName,
+            jerseyNumber: player.number
+          }));
+          
+          // Add players to the team
+          const playersResponse = await axios.post(`${API_URL}/teams/${teamToAdd.id}/players`, {
+            playerIds: teamData.playerIds || [],
+            newPlayers: mappedNewPlayers
+          }, {
+            headers: {
+              'Authorization': `Bearer ${user.value.token}`
+            },
+            withCredentials: true
+          })
+          
+          // Update the team with the added players
+          if (playersResponse.data.data) {
+            teamToAdd.players = playersResponse.data.data.players
+          }
+        } catch (playerError) {
+          console.error('Error adding players to team:', playerError)
+          // Continue even if adding players fails
+        }
+      }
+      
       // Add the new team to the teams list
-      teams.value.push(response.data)
-      return response.data
+      if (!teams.value) {
+        teams.value = [];
+      }
+      
+      teams.value.push(teamToAdd);
+      return teamToAdd;
     } catch (err) {
       console.error('Error creating team:', err)
       error.value = {
@@ -155,10 +192,16 @@ export function useTeams() {
         throw new Error('You must be logged in to update a team')
       }
 
+      // Map the new players to the format expected by the backend
+      const mappedNewPlayers = (teamData.newPlayers || []).map(player => ({
+        name: player.name || player.displayName,
+        jerseyNumber: player.number
+      }));
+
       const response = await axios.put(`${API_URL}/teams/${teamId}`, {
         name: teamData.name,
         playerIds: teamData.playerIds || [],
-        newPlayers: teamData.newPlayers || []
+        newPlayers: mappedNewPlayers
       }, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
@@ -168,11 +211,12 @@ export function useTeams() {
       
       // Update the team in the teams list
       const index = teams.value.findIndex(team => team.id === teamId)
+      const updatedTeam = response.data.data || response.data;
       if (index !== -1) {
-        teams.value[index] = response.data
+        teams.value[index] = updatedTeam;
       }
       
-      return response.data
+      return updatedTeam;
     } catch (err) {
       console.error('Error updating team:', err)
       error.value = {
