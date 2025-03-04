@@ -77,7 +77,7 @@
                           :id="`edit-player-name-${index}`"
                           v-model="player.displayName" 
                           type="text" 
-                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
                           placeholder="Enter player name"
                           required
                         />
@@ -90,7 +90,7 @@
                           type="number" 
                           min="1"
                           max="99"
-                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
                           placeholder="Enter jersey number"
                           required
                         />
@@ -365,14 +365,19 @@
 
         <!-- Teams display -->
         <div v-if="teams.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div v-for="team in visibleTeams" :key="team.id" class="bg-white p-6 rounded-lg shadow-lg">
+          <div 
+            v-for="team in visibleTeams" 
+            :key="team.id" 
+            class="bg-white p-6 rounded-lg shadow-lg cursor-pointer"
+            @click="viewTeamDetails(team)"
+          >
             <div class="flex justify-between items-start">
               <div class="flex-grow">
                 <div class="flex justify-between items-center mb-4">
                   <h2 class="text-xl font-bold">{{ team.name }}</h2>
                   <div v-if="user?.role === 'Manager'" class="flex space-x-2">
                     <button 
-                      @click="editTeam(team)"
+                      @click.stop="editTeam(team)"
                       class="text-blue-600 hover:text-blue-800"
                       title="Edit Team"
                     >
@@ -381,7 +386,7 @@
                       </svg>
                     </button>
                     <button 
-                      @click="confirmDeleteTeam(team.id)"
+                      @click.stop="confirmDeleteTeam(team.id)"
                       class="text-red-600 hover:text-red-800"
                       title="Delete Team"
                     >
@@ -402,7 +407,7 @@
                     <h3 class="text-lg font-semibold">Players ({{ team.players?.length || 0 }})</h3>
                     <button 
                       v-if="team.players?.length > 3" 
-                      @click="togglePlayerList(team.id)"
+                      @click.stop="togglePlayerList(team.id)"
                       class="text-sm text-blue-600 hover:text-blue-800"
                     >
                       {{ expandedTeams.includes(team.id) ? 'Show Less' : 'Show All' }}
@@ -433,6 +438,49 @@
           </div>
         </div>
         
+        <!-- Team Details Modal -->
+        <div v-if="showTeamDetails" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+          <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-bold">{{ selectedTeam.name }}</h2>
+              <button 
+                @click="closeTeamDetails"
+                class="text-gray-500 hover:text-gray-700"
+                title="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600 mb-4">Manager: {{ selectedTeam.manager?.displayName || 'No Manager' }}</p>
+              <div>
+                <h3 class="text-lg font-semibold mb-2">Players ({{ selectedTeam.players?.length || 0 }})</h3>
+                <div class="space-y-2">
+                  <div v-if="selectedTeam.players?.length" class="divide-y divide-gray-200">
+                    <div 
+                      v-for="(player, playerIndex) in selectedTeam.players" 
+                      :key="player.id" 
+                      class="py-2 flex justify-between items-center"
+                    >
+                      <div>
+                        <p class="font-medium">{{ player.displayName }}</p>
+                        <p class="text-sm text-gray-600">
+                          <span v-if="player.jerseyNumber">Jersey #{{ player.jerseyNumber }}</span>
+                          <span v-else-if="player.number">Jersey #{{ player.number }}</span>
+                          <span v-if="player.gamesPlayed"> • Games Played: {{ player.gamesPlayed }}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <p v-else class="text-gray-500 text-sm">No players in this team</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Load more teams button -->
         <div v-if="teams.length > visibleTeamCount" class="mt-6 text-center">
           <button 
@@ -479,6 +527,8 @@ export default {
     const visibleTeamCount = ref(6) // Initial number of teams to show
     const initialLoadComplete = ref(false)
     const skeletonCount = ref(3) // Number of skeleton items to show during loading
+    const showTeamDetails = ref(false)
+    const selectedTeam = ref(null)
     
     // Computed property for visible teams (pagination)
     const visibleTeams = computed(() => {
@@ -655,6 +705,18 @@ export default {
       })
     }
 
+    // Function to view team details
+    const viewTeamDetails = (team) => {
+      selectedTeam.value = team
+      showTeamDetails.value = true
+    }
+
+    // Function to close team details modal
+    const closeTeamDetails = () => {
+      showTeamDetails.value = false
+      selectedTeam.value = null
+    }
+
     // Initialize component with optimized loading sequence
     onMounted(async () => {
       // Initialize auth first
@@ -710,6 +772,8 @@ export default {
       expandedTeams,
       initialLoadComplete,
       skeletonCount,
+      showTeamDetails,
+      selectedTeam,
       handleCreateTeam,
       handleUpdateTeam,
       confirmDeleteTeam,
@@ -724,6 +788,8 @@ export default {
       loadMoreTeams,
       togglePlayerList,
       getVisiblePlayers,
+      viewTeamDetails,
+      closeTeamDetails,
       user
     }
   },
