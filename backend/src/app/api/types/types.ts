@@ -60,25 +60,24 @@ export const PlayerUpdateSchema = z.object({
 });
 
 // Game schemas
-export const GameSchema = z.object({
-  id: z.string().optional(),
-  date: z.string(),
-  location: z.string(),
-  homeTeamId: z.string(),
-  awayTeamId: z.string(),
-  homeTeamScore: z.number().int().default(0),
-  awayTeamScore: z.number().int().default(0),
-  status: z.enum(["scheduled", "in_progress", "completed"]).default("scheduled"),
+export const GameCreateSchema = z.object({
+  game: z.string(),
+  myTeam: z.string(),
+  myPts: z.number().int(),
+  oppTeam: z.string(),
+  oppPts: z.number().int(),
+  sets: z.number().int(),
+  created_at: z.date().optional()
 });
 
 export const GameUpdateSchema = z.object({
-  date: z.string().optional(),
-  location: z.string().optional(),
-  homeTeamId: z.string().optional(),
-  awayTeamId: z.string().optional(),
-  homeTeamScore: z.number().int().optional(),
-  awayTeamScore: z.number().int().optional(),
-  status: z.enum(["scheduled", "in_progress", "completed"]).optional(),
+  game: z.string().optional(),
+  myTeam: z.string().optional(),
+  myPts: z.number().int().optional(),
+  oppTeam: z.string().optional(),
+  oppPts: z.number().int().optional(),
+  sets: z.number().int().optional(),
+  created_at: z.date().optional()
 });
 
 // PlayerStat schemas
@@ -115,7 +114,7 @@ export type TeamCreateInput = z.infer<typeof TeamSchema>;
 export type TeamUpdateInput = z.infer<typeof TeamUpdateSchema>;
 export type PlayerCreateInput = z.infer<typeof PlayerSchema>;
 export type PlayerUpdateInput = z.infer<typeof PlayerUpdateSchema>;
-export type GameCreateInput = z.infer<typeof GameSchema>;
+export type GameCreateInput = z.infer<typeof GameCreateSchema>;
 export type GameUpdateInput = z.infer<typeof GameUpdateSchema>;
 export type PlayerStatCreateInput = z.infer<typeof PlayerStatSchema>;
 export type PlayerStatUpdateInput = z.infer<typeof PlayerStatUpdateSchema>;

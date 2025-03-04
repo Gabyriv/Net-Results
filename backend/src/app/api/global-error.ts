@@ -1,8 +1,6 @@
-"use client";
-
 import { NextResponse } from "next/server";
-import { handleServerError } from "./errors_handlers/errors";
-import { logger } from "@/utils/logger";
+import { handleServerError } from "./errors_handlers/server-errors";
+import { logger } from "@/utils/server-logger";
 
 /**
  * Higher-order function to wrap API route handlers with error handling
@@ -18,11 +16,10 @@ export function withErrorHandling(handler: (request: Request) => Promise<NextRes
       return await handler(request);
     } catch (error) {
       // Log the error
-      logger.error("Unhandled API error", {
-        path: request.url,
-        method: request.method,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      logger.error("Unhandled API error", errorObj, {
+        requestUrl: request.url,
+        method: request.method
       });
       
       // Handle the error and return an appropriate response

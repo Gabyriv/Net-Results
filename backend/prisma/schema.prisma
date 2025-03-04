@@ -26,7 +26,7 @@ model User {
 }
 
 model Manager {
-  id          String   @id @unique 
+  id          String   @id @unique
   displayName String
   teams       Team[]
   user        User     @relation(fields: [userId], references: [id])
@@ -45,11 +45,23 @@ model Player {
   id          String       @id @unique
   displayName String
   gamesPlayed Int
+  number      Int?         // Add the number field
   team        Team?        @relation(fields: [teamId], references: [id])
   teamId      String?
   user        User         @relation(fields: [userId], references: [id])
   userId      String       @unique
   playerStats PlayerStat[]
+}
+
+model Game {
+  id      Int    @id @unique
+  created_at  DateTime @default(now())
+  game String
+  myTeam  String
+  myPts   Int
+  oppTeam String
+  oppPts  Int
+  sets    Int
 }
 
 model PlayerStat {
@@ -58,9 +70,9 @@ model PlayerStat {
   created_at DateTime @default(now())
   dayOfGame  String
   player     Player   @relation(fields: [playerId], references: [id])
-  playerId   String   
+  playerId   String
   stat       Stat     @relation(fields: [statId], references: [id])
-  statId     Int     
+  statId     Int
 
   @@index([playerId])
   @@index([statId])
