@@ -24,7 +24,7 @@ export default {
   methods: {
     fetchBackendMessage() {
       console.log('Fetching data from backend...')
-      axios.get('/api/routeConnections')
+      axios.get('/api/route-connections')
         .then(response => {
           console.log('Response:', response)
           this.message = response.data.message

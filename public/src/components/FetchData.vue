@@ -79,7 +79,7 @@ export default {
       this.errors.basic = null
       
       try {
-        const response = await axios.get('/api/routeConnections')
+        const response = await axios.get('/api/route-connections')
         this.results.basic = `Message: ${response.data.message}, Status: ${response.data.status}, Time: ${response.data.timestamp}`
       } catch (error) {
         console.error('Connection test failed:', error)

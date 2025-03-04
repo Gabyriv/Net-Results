@@ -1,21 +1,14 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@/utils/supabase/server';
-import { logger } from '@/utils/logger';
+import { logger } from '@/utils/server-logger';
+import { NextResponse } from 'next/server';
+import { handleServerError } from '@/app/api/errors_handlers/server-errors';
 
 type ResponseData = {
     success?: boolean;
     error?: string;
 };
 
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse<ResponseData>
-) {
-    // Only allow POST method
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
+export async function POST(request: Request) {
     logger.info('Logout attempt', { path: '/api/auth/logout' });
     console.log('Logout attempt received');
 
@@ -28,9 +21,12 @@ export default async function handler(
         
         if (error) {
             logger.warn('Logout failed', { error: error.message });
-            return res.status(500).json({ error: 'Failed to logout' });
+            return NextResponse.json({ error: 'Failed to logout' }, { status: 500 });
         }
 
+        // Create response
+        const response = NextResponse.json({ success: true }, { status: 200 });
+        
         // Clear all auth-related cookies
         const cookiesToClear = [
             'auth_token',
@@ -39,21 +35,28 @@ export default async function handler(
         ];
 
         cookiesToClear.forEach(cookieName => {
-            res.setHeader('Set-Cookie', [
-                `${cookieName}=; Path=/; Max-Age=0`,
-                `${cookieName}=; Path=/; Domain=localhost; Max-Age=0`,
-                `${cookieName}=; Path=/api; Max-Age=0`
-            ]);
+            response.cookies.set(cookieName, '', {
+                path: '/',
+                maxAge: 0
+            });
+            
+            response.cookies.set(cookieName, '', {
+                path: '/',
+                domain: 'localhost',
+                maxAge: 0
+            });
+            
+            response.cookies.set(cookieName, '', {
+                path: '/api',
+                maxAge: 0
+            });
         });
         
         logger.info('Logout successful');
-        return res.status(200).json({ success: true });
+        return response;
     } catch (error) {
         console.error('Logout error:', error);
         logger.error('Logout error', error instanceof Error ? error : new Error(String(error)));
-        
-        return res.status(500).json({ 
-            error: 'Internal server error' 
-        });
+        return handleServerError(error);
     }
-}
+} 

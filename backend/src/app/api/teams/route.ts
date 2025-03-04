@@ -37,8 +37,13 @@ export async function GET(request: Request) {
                 where = { managerId };
             }
             // If myTeams is true and user is a manager, show only their teams
-            else if (myTeams && dbUser.role === 'Manager' && dbUser.manager) {
-                where = { managerId: dbUser.manager.id };
+            else if (myTeams && dbUser.role === 'Manager') {
+                if (!dbUser.manager) {
+                    logger.warn('User has Manager role but no manager record', { userId: dbUser.id });
+                    where = { managerId: 'none' }; // This will return no teams, as no team should have this ID
+                } else {
+                    where = { managerId: dbUser.manager.id };
+                }
             }
 
             // Get teams
@@ -124,11 +129,35 @@ export async function POST(request: Request) {
             // Log the successful team creation
             logger.info('Team created', { teamId, managerId: dbUser.manager.id });
             
-            // If there are new players to create, we'll handle them separately
-            if (newPlayers.length > 0) {
+            // If there are new players to create, redirect to the player creation endpoint
+            if (newPlayers && Array.isArray(newPlayers) && newPlayers.length > 0) {
                 logger.info('New players to be created', { count: newPlayers.length });
-                // In a real implementation, you might want to create these players
-                // through a separate API call or queue them for processing
+                
+                try {
+                    // Create a request to the player creation endpoint
+                    const playerEndpoint = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/teams/${teamId}/players`;
+                    
+                    // Make the request to create players
+                    const response = await fetch(playerEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': request.headers.get('Authorization') || ''
+                        },
+                        body: JSON.stringify({ newPlayers })
+                    });
+                    
+                    if (!response.ok) {
+                        logger.warn('Failed to create players', { 
+                            status: response.status,
+                            teamId
+                        });
+                    } else {
+                        logger.info('Players created successfully', { teamId });
+                    }
+                } catch (error) {
+                    logger.error('Error creating players', error instanceof Error ? error : new Error(String(error)));
+                }
             }
 
             return NextResponse.json({ success: true, data: team }, { status: 201 });

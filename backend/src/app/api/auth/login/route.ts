@@ -1,7 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
-import { logger } from '@/utils/logger';
+import { logger } from '@/utils/server-logger';
+import { NextResponse } from 'next/server';
+import { handleServerError } from '@/app/api/errors_handlers/server-errors';
 
 // Schema for login validation
 const LoginSchema = z.object({
@@ -20,15 +21,7 @@ type ResponseData = {
     };
 };
 
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse<ResponseData>
-) {
-    // Only allow POST method
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
+export async function POST(request: Request) {
     logger.info('Login attempt', { path: '/api/auth/login' });
     console.log('Login attempt received');
     
@@ -41,7 +34,7 @@ export default async function handler(
     
     try {
         // Validate request body
-        const body = req.body;
+        const body = await request.json();
         console.log('Request body:', body);
         const validated = LoginSchema.parse(body);
         console.log('Validation passed for:', validated.email);
@@ -50,7 +43,7 @@ export default async function handler(
             console.log('Creating Supabase client');
             // Create Supabase client for authentication
             // Create admin client for better auth handling
-    const supabase = await createClient(undefined, process.env.SUPABASE_SERVICE_ROLE_KEY);
+            const supabase = await createClient(undefined, process.env.SUPABASE_SERVICE_ROLE_KEY);
             console.log('Supabase client created successfully');
             
             // Attempt to sign in with Supabase
@@ -93,7 +86,7 @@ export default async function handler(
                     if (authError.message === 'Email not confirmed') {
                         // In development mode, provide a more helpful message with the confirmation endpoint
                         if (process.env.NODE_ENV !== 'production') {
-                            return res.status(401).json({ 
+                            return NextResponse.json({ 
                                 error: 'Email not confirmed', 
                                 code: 'email_not_confirmed',
                                 data: {
@@ -105,26 +98,26 @@ export default async function handler(
                                         email: validated.email 
                                     }
                                 }
-                            });
+                            }, { status: 401 });
                         } else {
-                            return res.status(401).json({ 
+                            return NextResponse.json({ 
                                 error: 'Please check your email to confirm your account before logging in.',
                                 code: 'email_not_confirmed'
-                            });
+                            }, { status: 401 });
                         }
                     } else if (authError.message === 'Invalid login credentials') {
-                        return res.status(401).json({ 
+                        return NextResponse.json({ 
                             error: 'The email or password you entered is incorrect.',
                             code: 'invalid_credentials'
-                        });
+                        }, { status: 401 });
                     }
                 }
                 
                 // Generic error response for other cases
-                return res.status(401).json({ 
+                return NextResponse.json({ 
                     error: 'Authentication failed', 
                     code: 'auth_failed'
-                });
+                }, { status: 401 });
             }
             
             // Get user data from database to include role and display name
@@ -149,10 +142,10 @@ export default async function handler(
                     email: validated.email 
                 });
                 
-                return res.status(401).json({ 
+                return NextResponse.json({ 
                     error: 'User account incomplete', 
                     code: 'user_not_found' 
-                });
+                }, { status: 401 });
             }
             
             logger.info('Login successful', { 
@@ -160,99 +153,58 @@ export default async function handler(
                 role: user.role
             });
             
-            // Create session with user metadata - commented out as it's not currently used
-            // const session = {
-            //     ...authData.session,
-            //     user: {
-            //         ...authData.session.user,
-            //         role: user.role,
-            //         user_metadata: {
-            //             ...authData.session.user.user_metadata,
-            //             role: user.role,
-            //             displayName: user.displayName
-            //         }
-            //     }
-            // };
-            
             // Prepare successful login response
             console.log('Preparing successful login response');
-            // Commented out as it's not currently used
-            // const responseData = { 
-            //     success: true, 
-            //     data: { 
-            //         session, 
-            //         user: session.user
-            //     } 
-            // };
             console.log('Response data prepared');
             
-            // Set auth cookies
+            // Create response with auth cookies
             console.log('Setting auth cookies');
-            res.setHeader('Set-Cookie', [
-              `sb-access-token=${authData.session.access_token}; HttpOnly; Path=/; Max-Age=${60 * 60 * 24 * 7}; Domain=localhost; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=Lax' : ''}`,
-              `sb-refresh-token=${authData.session.refresh_token}; HttpOnly; Path=/; Max-Age=${60 * 60 * 24 * 7}; Domain=localhost; ${process.env.NODE_ENV === 'production' ? 'Secure; SameSite=Lax' : ''}`
-            ]);
+            const response = NextResponse.json({
+                success: true,
+                data: {
+                    user: {
+                        id: user.id,
+                        email: user.email,
+                        displayName: user.displayName,
+                        role: user.role
+                    },
+                    session: {
+                        access_token: authData.session.access_token,
+                        expires_at: authData.session.expires_at
+                    }
+                }
+            }, { status: 200 });
+            
+            // Set cookies in the response
+            response.cookies.set('sb-access-token', authData.session.access_token, {
+                httpOnly: true,
+                path: '/',
+                maxAge: 60 * 60 * 24 * 7, // 1 week
+                domain: 'localhost',
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'lax' : undefined
+            });
+            
+            response.cookies.set('sb-refresh-token', authData.session.refresh_token, {
+                httpOnly: true,
+                path: '/',
+                maxAge: 60 * 60 * 24 * 7, // 1 week
+                domain: 'localhost',
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'lax' : undefined
+            });
 
             // Return successful login response with user data
             console.log('Returning successful login response');
-            return res.status(200).json({
-              success: true,
-              data: {
-                user: {
-                  id: user.id,
-                  email: user.email,
-                  displayName: user.displayName,
-                  role: user.role
-                },
-                session: {
-                  access_token: authData.session.access_token,
-                  expires_at: authData.session.expires_at
-                }
-              }
-            });
+            return response;
         } catch (error) {
             console.error('Login processing error:', error);
             logger.error('Login processing error', error instanceof Error ? error : new Error(String(error)));
-            return handleServerError(error, res);
+            return handleServerError(error);
         }
     } catch (error) {
         console.error('Login validation error:', error);
         logger.error('Login validation error', error instanceof Error ? error : new Error(String(error)));
-        return handleServerError(error, res);
+        return handleServerError(error);
     }
-}
-
-// Helper function to handle server errors
-function handleServerError(error: unknown, res: NextApiResponse) {
-    if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-            error: 'Validation error',
-            details: error.errors 
-        });
-    }
-
-    // Handle Prisma errors
-    if (error instanceof Error && error.name === 'PrismaClientKnownRequestError') {
-        const prismaError = error as unknown as { code: string; message: string };
-        switch (prismaError.code) {
-            case 'P2002':
-                return res.status(409).json({ error: 'Email already exists' });
-            case 'P2025':
-                return res.status(404).json({ error: 'Resource not found' });
-            default:
-                return res.status(500).json({ 
-                    error: 'Database error', 
-                    details: prismaError.message 
-                });
-        }
-    }
-
-    if (error instanceof Error && error.name === 'PrismaClientValidationError') {
-        return res.status(400).json({ error: 'Invalid data format' });
-    }
-
-    return res.status(500).json({ 
-        error: 'Internal Server Error', 
-        details: error instanceof Error ? error.message : String(error) 
-    });
-}
+} 

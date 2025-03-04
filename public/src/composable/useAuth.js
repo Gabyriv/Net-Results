@@ -101,13 +101,16 @@ export function useAuth() {
     authError.value = null
     
     try {
-      console.log('Attempting to register user:', userData.email)
+      console.log('Attempting to register user:', userData.email, 'with role:', userData.role)
+      
+      // Ensure role is explicitly set, defaulting to Manager if not provided
+      const role = userData.role || 'Manager'
       
       const response = await axios.post(`${API_URL}/users`, {
         email: userData.email,
         password: userData.password,
         displayName: userData.displayName || userData.email.split('@')[0],
-        role: userData.role || 'Player'
+        role: role
       })
       
       console.log('Registration response:', response)
@@ -120,11 +123,21 @@ export function useAuth() {
       
       // After successful registration, attempt to login automatically
       try {
-        console.log('Attempting automatic login after registration')
-        return await login({
+        console.log('Attempting automatic login after registration with role:', role)
+        const loginResult = await login({
           email: userData.email,
           password: userData.password
         })
+        
+        if (loginResult.success) {
+          console.log('Auto-login successful, redirecting to dashboard')
+          router.push('/dashboard')
+          return { success: true, data: response.data }
+        } else {
+          console.warn('Auto-login failed, redirecting to login page')
+          router.push('/login')
+          return { success: true, data: response.data }
+        }
       } catch (loginError) {
         console.error('Auto-login after registration failed:', loginError)
         // If auto-login fails, still consider registration successful and redirect to login page
@@ -203,6 +216,9 @@ export function useAuth() {
       
       // Also set the token in a cookie
       document.cookie = `auth_token=${user.value.token}; path=/; max-age=${7 * 24 * 60 * 60}; ${location.protocol === 'https:' ? 'secure; samesite=lax' : ''}`
+      
+      // Redirect to dashboard after successful login
+      router.push('/')
       
       return { success: true }
     } catch (error) {

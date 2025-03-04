@@ -1,23 +1,34 @@
 import { NextResponse } from "next/server"
-import { ZodError, ZodIssue } from "zod"
+import { ZodError } from "zod"
 import { Prisma } from "@prisma/client"
 
 type ErrorResponse = {
     error: string;
-    details?: ZodIssue[] | string;
+    details?: any;
 }
 
 export function handleServerError(error: unknown): NextResponse<ErrorResponse> {
-    console.error('Server error:', error)
+    // Ensure error is not null or undefined
+    if (!error) {
+        return NextResponse.json(
+            { error: 'An unknown error occurred' },
+            { status: 500 }
+        );
+    }
+
+    // Log the error safely without trying to stringify it directly
+    if (error instanceof Error) {
+        console.error('Server error:', error.message);
+    } else {
+        console.error('Server error: Unknown error type');
+    }
 
     if (error instanceof ZodError) {
+        // Handle validation errors
         return NextResponse.json(
-            { 
-                error: 'Validation error',
-                details: error.errors 
-            },
+            { error: 'Validation error', details: error.errors },
             { status: 400 }
-        )
+        );
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -47,8 +58,11 @@ export function handleServerError(error: unknown): NextResponse<ErrorResponse> {
         )
     }
 
+    // Handle other types of errors
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    
     return NextResponse.json(
-        { error: 'Internal Server Error', details: (error as Error).message },
+        { error: errorMessage },
         { status: 500 }
-    )
+    );
 } 

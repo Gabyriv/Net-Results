@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/config/prisma";
 import { createClient } from "@supabase/supabase-js";
-import { logger } from "@/utils/logger";
+import { logger } from "@/utils/server-logger";
 import os from "os";
 
 interface HealthStatus {
@@ -78,8 +78,7 @@ export async function GET() {
     
     // Log health check result in production
     if (environment === 'production') {
-      logger.info({
-        message: `Health check completed with status: ${overallStatus}`,
+      logger.info(`Health check completed with status: ${overallStatus}`, {
         responseTime,
         dbStatus,
         authStatus,
@@ -122,10 +121,7 @@ export async function GET() {
       }
     });
   } catch (error) {
-    logger.error({
-      message: "Health check failed",
-      error: error instanceof Error ? error.message : String(error)
-    });
+    logger.error("Health check failed", error instanceof Error ? error : new Error(String(error)));
     
     return NextResponse.json({
       status: "error",
@@ -159,10 +155,7 @@ async function checkDatabaseConnection(checks: HealthStatus["checks"]): Promise<
     
     return true;
   } catch (error) {
-    logger.error({
-      message: "Database connection check failed",
-      error: error instanceof Error ? error.message : String(error)
-    });
+    logger.error("Database connection check failed", error instanceof Error ? error : new Error(String(error)));
     
     checks.database = {
       status: "error",
@@ -216,10 +209,7 @@ async function checkAuthService(checks: HealthStatus["checks"]): Promise<boolean
     
     return true;
   } catch (error) {
-    logger.error({
-      message: "Auth service check failed",
-      error: error instanceof Error ? error.message : String(error)
-    });
+    logger.error("Auth service check failed", error instanceof Error ? error : new Error(String(error)));
     
     checks.auth = {
       status: "error",

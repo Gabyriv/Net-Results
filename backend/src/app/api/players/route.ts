@@ -36,7 +36,7 @@ export async function GET(request: Request) {
             
             return NextResponse.json({ success: true, data: players }, { status: 200 });
         } catch (error) {
-            return handleServerError(error);
+            return handleServerError(error || new Error('Unknown error occurred'));
         }
     });
 }

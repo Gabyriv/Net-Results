@@ -18,7 +18,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
                 where: { id },
                 include: {
                     players: true,
-                    manager: true
+                    manager: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    email: true,
+                                    displayName: true,
+                                    role: true
+                                }
+                            }
+                        }
+                    }
                 }
             });
 
@@ -123,58 +134,110 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             if (newPlayers && Array.isArray(newPlayers) && newPlayers.length > 0) {
                 logger.info(`Creating ${newPlayers.length} new players for team ${id}`);
                 
+                // Log the new players data for debugging
+                console.log('New players data:', JSON.stringify(newPlayers));
+                
                 // Create new players with User records
-                await Promise.all(newPlayers.map(async (player) => {
-                    // Generate a unique ID for the user based on timestamp
-                    const userId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                    // Generate a unique ID for the player
-                    const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                    
-                    // Create a User record first
-                    const newUser = await prismaClient.user.create({
-                        data: {
-                            id: userId,
-                            email: `player_${Date.now()}@example.com`, // Placeholder email
-                            password: Math.random().toString(36).substring(2, 15), // Random password
-                            role: 'Player',
-                            displayName: player.displayName,
-                            player: {
-                                create: {
-                                    id: playerId,
-                                    displayName: player.displayName,
-                                    gamesPlayed: 0,
-                                    team: {
-                                        connect: {
-                                            id: id
+                for (const player of newPlayers) {
+                    try {
+                        // Validate player data
+                        if (!player || typeof player !== 'object') {
+                            logger.warn('Invalid player data, not an object');
+                            continue;
+                        }
+                        
+                        // Check for displayName field
+                        if (!player.displayName && !player.name) {
+                            logger.warn('Skipping player creation due to missing displayName/name');
+                            continue;
+                        }
+                        
+                        // Ensure displayName is set
+                        const displayName = player.displayName || player.name || 'Player';
+                        
+                        // Handle jersey number (frontend sends as 'number')
+                        const jerseyNumber = player.number !== undefined ? player.number : 
+                                            player.jerseyNumber !== undefined ? player.jerseyNumber : null;
+                        
+                        console.log('Creating player with data:', {
+                            displayName,
+                            jerseyNumber
+                        });
+                        
+                        // Generate unique IDs with timestamps to avoid collisions
+                        const timestamp = Date.now();
+                        const randomString = Math.random().toString(36).substring(2, 9);
+                        
+                        // Generate a unique ID for the user
+                        const userId = `user_${timestamp}_${randomString}`;
+                        // Generate a unique ID for the player
+                        const playerId = `player_${timestamp}_${randomString}`;
+                        
+                        // Create a User record first
+                        const newUser = await prismaClient.user.create({
+                            data: {
+                                id: userId,
+                                email: `player_${timestamp}@example.com`, // Placeholder email
+                                password: Math.random().toString(36).substring(2, 15), // Random password
+                                role: 'Player',
+                                displayName: displayName,
+                                player: {
+                                    create: {
+                                        id: playerId,
+                                        displayName: displayName,
+                                        gamesPlayed: 0,
+                                        number: jerseyNumber ? parseInt(String(jerseyNumber)) : null,
+                                        team: {
+                                            connect: {
+                                                id: id
+                                            }
                                         }
                                     }
                                 }
+                            },
+                            include: {
+                                player: true
                             }
-                        },
-                        include: {
-                            player: true
-                        }
-                    });
-                    
-                    return newUser;
-                }));
+                        });
+                        
+                        logger.info(`Created new player ${playerId} for team ${id}`);
+                    } catch (error) {
+                        console.error('Error creating player:', error);
+                        logger.error('Error creating player', error instanceof Error ? error : new Error(String(error)));
+                        // Continue with other players even if one fails
+                    }
+                }
             }
             
-            // Fetch the updated team with all players
-            const finalTeam = await prismaClient.team.findUnique({
+            // After all operations, get the updated team with all players
+            const updatedTeamWithPlayers = await prismaClient.team.findUnique({
                 where: { id },
                 include: {
                     players: true,
                     manager: {
-                        select: {
-                            displayName: true
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    email: true,
+                                    displayName: true,
+                                    role: true
+                                }
+                            }
                         }
                     }
                 }
             });
-
-            logger.info('Team updated', { teamId: id, managerId: dbUser.manager?.id });
-            return NextResponse.json({ success: true, data: finalTeam }, { status: 200 });
+            
+            logger.info('Team updated', { 
+                teamId: id, 
+                managerId: dbUser.manager?.id || 'unknown'
+            });
+            
+            return NextResponse.json({ 
+                success: true, 
+                data: updatedTeamWithPlayers 
+            }, { status: 200 });
         } catch (error) {
             return handleServerError(error);
         }

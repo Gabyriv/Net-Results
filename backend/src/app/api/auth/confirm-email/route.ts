@@ -1,19 +1,15 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@/utils/supabase/server';
+import { logger } from '@/utils/server-logger';
 import { z } from 'zod';
-import { logger } from '@/utils/logger';
+import { NextResponse } from 'next/server';
+import { handleServerError } from '@/app/api/errors_handlers/server-errors';
 
 // Validation schema for email confirmation
 const confirmEmailSchema = z.object({
   email: z.string().email('Invalid email format'),
 });
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export async function POST(request: Request) {
   logger.info('Email confirmation request', {
     path: '/api/auth/confirm-email',
   });
@@ -21,20 +17,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   console.log('Email confirmation request received');
 
   try {
-    console.log('Request body received:', typeof req.body, req.body);
+    // Parse the request body
+    let bodyToParse;
+    const contentType = request.headers.get('content-type') || '';
     
-    // Parse the request body if it's a string (happens with some clients)
-    let bodyToParse = req.body;
-    if (typeof req.body === 'string') {
+    if (contentType.includes('application/json')) {
+      bodyToParse = await request.json();
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await request.formData();
+      bodyToParse = Object.fromEntries(formData.entries());
+    } else {
+      // Try to parse as JSON as a fallback
       try {
-        bodyToParse = JSON.parse(req.body);
+        const text = await request.text();
+        bodyToParse = JSON.parse(text);
       } catch (parseError) {
-        console.error('Error parsing request body string:', parseError);
-        // If we can't parse it as JSON, check if it's a URL-encoded form
-        if (req.body.includes('=')) {
-          const params = new URLSearchParams(req.body);
-          bodyToParse = Object.fromEntries(params.entries());
-        }
+        console.error('Error parsing request body:', parseError);
+        return NextResponse.json({ 
+          error: 'Invalid request format' 
+        }, { status: 400 });
       }
     }
     
@@ -46,10 +47,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Only allow this in development mode
     if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({
+      return NextResponse.json({
         error: 'This endpoint is only available in development mode',
         code: 'dev_only'
-      });
+      }, { status: 403 });
     }
 
     // Create Supabase client
@@ -67,22 +68,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (getUserError) {
       console.error('Error fetching users:', getUserError);
-      return res.status(500).json({ 
+      return NextResponse.json({ 
         error: 'Failed to fetch users', 
         code: 'fetch_error',
         message: getUserError.message
-      });
+      }, { status: 500 });
     }
     
     const user = users.find(u => u.email === validated.email);
     
     if (!user) {
       console.error('User not found:', validated.email);
-      return res.status(404).json({ 
+      return NextResponse.json({ 
         error: 'User not found', 
         code: 'user_not_found',
         message: 'No user found with this email address'
-      });
+      }, { status: 404 });
     }
     
     // Update the user to confirm their email
@@ -94,11 +95,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (updateError) {
       console.error('Error confirming email:', updateError);
-      return res.status(500).json({ 
+      return NextResponse.json({ 
         error: 'Failed to confirm email', 
         code: 'update_error',
         message: updateError.message
-      });
+      }, { status: 500 });
     }
     
     // Try to sign in the user to verify everything works
@@ -115,24 +116,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Return success response
-    return res.status(200).json({
+    return NextResponse.json({
       success: true,
       message: 'Email confirmation process initiated. In development mode, you can now try to log in.'
-    });
+    }, { status: 200 });
     
   } catch (error) {
     console.error('Error in email confirmation:', error);
-    
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Validation error', 
-        details: error.errors 
-      });
-    }
-    
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      message: error instanceof Error ? error.message : 'Unknown error' 
-    });
+    return handleServerError(error);
   }
-}
+} 

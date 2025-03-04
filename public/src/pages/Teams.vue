@@ -88,8 +88,7 @@
                           :id="`edit-player-number-${index}`"
                           v-model="player.number" 
                           type="number" 
-                          min="1"
-                          max="99"
+                          min="0"
                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
                           placeholder="Enter jersey number"
                           required

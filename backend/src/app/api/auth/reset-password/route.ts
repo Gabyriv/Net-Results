@@ -1,7 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@/utils/supabase/server';
+import { logger } from '@/utils/server-logger';
 import { z } from 'zod';
-import { logger } from '@/utils/logger';
+import { NextResponse } from 'next/server';
+import { handleServerError } from '@/app/api/errors_handlers/server-errors';
 
 // Validation schema for password reset
 const resetPasswordSchema = z.object({
@@ -9,12 +10,7 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export async function POST(request: Request) {
   logger.info('Password reset request', {
     path: '/api/auth/reset-password',
   });
@@ -22,17 +18,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   console.log('Password reset request received');
 
   try {
-    // Parse the request body if it's a string
-    let bodyToParse = req.body;
-    if (typeof req.body === 'string') {
+    // Parse the request body
+    let bodyToParse;
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      bodyToParse = await request.json();
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await request.formData();
+      bodyToParse = Object.fromEntries(formData.entries());
+    } else {
+      // Try to parse as JSON as a fallback
       try {
-        bodyToParse = JSON.parse(req.body);
+        const text = await request.text();
+        bodyToParse = JSON.parse(text);
       } catch (parseError) {
-        console.error('Error parsing request body string:', parseError);
-        if (req.body.includes('=')) {
-          const params = new URLSearchParams(req.body);
-          bodyToParse = Object.fromEntries(params.entries());
-        }
+        console.error('Error parsing request body:', parseError);
+        return NextResponse.json({ 
+          error: 'Invalid request format' 
+        }, { status: 400 });
       }
     }
     
@@ -44,10 +48,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Only allow this in development mode
     if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({
+      return NextResponse.json({
         error: 'This endpoint is only available in development mode',
         code: 'dev_only'
-      });
+      }, { status: 403 });
     }
 
     // Create Supabase client
@@ -62,11 +66,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (resetError) {
       console.error('Error sending password reset email:', resetError.message);
-      return res.status(500).json({ 
+      return NextResponse.json({ 
         error: 'Failed to send password reset email', 
         code: 'reset_error',
         message: resetError.message
-      });
+      }, { status: 500 });
     }
     
     // For development convenience, we'll also try to update the password directly
@@ -84,24 +88,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Return success response with instructions
-    return res.status(200).json({
+    return NextResponse.json({
       success: true,
       message: 'Password reset email sent. Please check your email and click the link to complete the password reset process. After resetting your password, you will be able to log in with your new credentials.'
-    });
+    }, { status: 200 });
     
   } catch (error) {
     console.error('Error in password reset:', error);
-    
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        error: 'Validation error', 
-        details: error.errors 
-      });
-    }
-    
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      message: error instanceof Error ? error.message : 'Unknown error' 
-    });
+    return handleServerError(error);
   }
-}
+} 
