@@ -427,6 +427,31 @@
                             <span v-if="player.gamesPlayed"> • Games Played: {{ player.gamesPlayed }}</span>
                           </p>
                         </div>
+                        <div class="flex space-x-2">
+                          <!-- Edit button -->
+                          <button 
+                            v-if="user?.role === 'Manager' || (user?.role === 'TeamManager' && user?.id === team.managerId)"
+                            @click.stop="editPlayer(player, $event)"
+                            class="text-blue-600 hover:text-blue-800"
+                            title="Edit Player"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          
+                          <!-- Delete button -->
+                          <button 
+                            v-if="user?.role === 'Manager' || (user?.role === 'TeamManager' && user?.id === team.managerId)"
+                            @click.stop="confirmDeletePlayer(player, $event)"
+                            class="text-red-600 hover:text-red-800"
+                            title="Delete Player"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <p v-else class="text-gray-500 text-sm">No players in this team</p>
@@ -471,6 +496,31 @@
                           <span v-if="player.gamesPlayed"> • Games Played: {{ player.gamesPlayed }}</span>
                         </p>
                       </div>
+                      <div class="flex space-x-2">
+                        <!-- Edit button -->
+                        <button 
+                          v-if="user?.role === 'Manager' || (user?.role === 'TeamManager' && user?.id === selectedTeam.managerId)"
+                          @click="editPlayer(player)"
+                          class="text-blue-600 hover:text-blue-800"
+                          title="Edit Player"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        
+                        <!-- Delete button -->
+                        <button 
+                          v-if="user?.role === 'Manager' || (user?.role === 'TeamManager' && user?.id === selectedTeam.managerId)"
+                          @click="confirmDeletePlayer(player)"
+                          class="text-red-600 hover:text-red-800"
+                          title="Delete Player"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <p v-else class="text-gray-500 text-sm">No players in this team</p>
@@ -492,12 +542,92 @@
       </div>
     </div>
   </DefaultLayout>
+
+  <!-- Player Edit Modal -->
+  <div v-if="showPlayerEditForm" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">Edit Player</h2>
+        <button 
+          @click="cancelEditPlayer"
+          class="text-gray-500 hover:text-gray-700"
+          title="Close"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Player edit error message -->
+      <div v-if="playerEditError" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+        <span class="block sm:inline">{{ playerEditError }}</span>
+      </div>
+      
+      <form @submit.prevent="savePlayerEdit" class="space-y-4">
+        <div>
+          <label for="playerName" class="block text-lg font-medium text-gray-700">Player Name</label>
+          <input 
+            type="text" 
+            id="playerName" 
+            v-model="editingPlayer.displayName" 
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
+            required
+          />
+        </div>
+        
+        <div>
+          <label for="jerseyNumber" class="block text-lg font-medium text-gray-700">Jersey Number</label>
+          <input 
+            type="number" 
+            id="jerseyNumber" 
+            v-model="editingPlayer.jerseyNumber" 
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
+          />
+        </div>
+        
+        <div>
+          <label for="playerTeam" class="block text-lg font-medium text-gray-700">Team</label>
+          <select 
+            id="playerTeam" 
+            v-model="editingPlayer.teamId" 
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg"
+          >
+            <option :value="null">No Team</option>
+            <option v-for="team in teams" :key="team.id" :value="team.id">
+              {{ team.name }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="flex space-x-4 pt-4">
+          <button 
+            type="submit" 
+            class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            :disabled="playerEditLoading"
+          >
+            <span v-if="playerEditLoading">Saving...</span>
+            <span v-else>Save Changes</span>
+          </button>
+          
+          <button 
+            type="button"
+            @click="cancelEditPlayer"
+            class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </template>
 
 <script>
 import { onMounted, ref, computed, nextTick, defineAsyncComponent } from 'vue'
 import { useTeams } from '../composable/useTeams'
 import { useAuth } from '../composable/useAuth'
+import { usePlayers } from '../composable/usePlayers'
 import DefaultLayout from "../layouts/DefaultLayout.vue"
 
 // Lazy load the LoadingSpinner component
@@ -511,6 +641,7 @@ export default {
   setup() {
     const { teams, availablePlayers, error, loading, fetchTeams, fetchAvailablePlayers, createTeam, deleteTeam, updateTeam } = useTeams()
     const { user, initAuth } = useAuth()
+    const { updatePlayerById, deletePlayerById } = usePlayers()
     const newTeam = ref({
       name: '',
       playerIds: [],
@@ -528,6 +659,12 @@ export default {
     const skeletonCount = ref(3) // Number of skeleton items to show during loading
     const showTeamDetails = ref(false)
     const selectedTeam = ref(null)
+    
+    // Add for player editing functionality
+    const editingPlayer = ref(null)
+    const showPlayerEditForm = ref(false)
+    const playerEditError = ref(null)
+    const playerEditLoading = ref(false)
     
     // Computed property for visible teams (pagination)
     const visibleTeams = computed(() => {
@@ -716,6 +853,129 @@ export default {
       selectedTeam.value = null
     }
 
+    // Function to start editing a player
+    const editPlayer = (player, event) => {
+      if (event) {
+        event.stopPropagation() // Prevent team details from opening
+      }
+      
+      editingPlayer.value = {
+        id: player.id,
+        displayName: player.displayName,
+        jerseyNumber: player.jerseyNumber || player.number || '',
+        teamId: player.teamId
+      }
+      
+      showPlayerEditForm.value = true
+    }
+    
+    // Function to cancel player editing
+    const cancelEditPlayer = () => {
+      editingPlayer.value = null
+      showPlayerEditForm.value = false
+      playerEditError.value = null
+    }
+    
+    // Function to save player edits
+    const savePlayerEdit = async () => {
+      if (!editingPlayer.value) return
+      
+      playerEditLoading.value = true
+      playerEditError.value = null
+      
+      try {
+        const playerData = {
+          displayName: editingPlayer.value.displayName,
+          jerseyNumber: editingPlayer.value.jerseyNumber,
+          teamId: editingPlayer.value.teamId
+        }
+        
+        // Call the updatePlayerById function from usePlayers
+        const response = await updatePlayerById(editingPlayer.value.id, playerData)
+        
+        console.log('Player update response:', response)
+        
+        // Get the updated player data from the response
+        const updatedPlayer = response && response.data ? response.data : response
+        
+        if (!updatedPlayer) {
+          throw new Error('No player data received from server')
+        }
+        
+        console.log('Updated player data:', updatedPlayer)
+        
+        // Refresh team data to get the latest changes
+        if (user.value?.role === 'Manager') {
+          await fetchTeams({ myTeams: true })
+        } else {
+          await fetchTeams()
+        }
+        
+        // If player was moved to a different team or removed from team, handle that scenario
+        if (editingPlayer.value.teamId !== updatedPlayer.teamId) {
+          // Refresh team data to ensure all teams are properly updated
+          console.log('Team changed - refreshing all team data')
+        }
+        
+        // Close the edit form
+        showPlayerEditForm.value = false
+        editingPlayer.value = null
+        
+        // Success notification
+        alert('Player updated successfully!')
+      } catch (err) {
+        playerEditError.value = err.message || 'Failed to update player'
+        console.error('Failed to update player:', err)
+      } finally {
+        playerEditLoading.value = false
+      }
+    }
+
+    // Function to confirm and delete a player
+    const confirmDeletePlayer = async (player, event) => {
+      if (event) {
+        event.stopPropagation() // Prevent team details from opening
+      }
+      
+      if (confirm(`Are you sure you want to delete the player "${player.displayName}"? This action cannot be undone.`)) {
+        try {
+          // Show loading state
+          loading.value = true
+          
+          // Call the deletePlayerById function
+          await deletePlayerById(player.id)
+          
+          // Refresh the teams data to update the UI
+          if (user.value?.role === 'Manager') {
+            await fetchTeams({ myTeams: true })
+          } else {
+            await fetchTeams()
+          }
+          
+          // Close team details if open
+          if (showTeamDetails.value && selectedTeam.value) {
+            // Refresh selectedTeam to remove the deleted player
+            const updatedTeam = teams.value.find(t => t.id === selectedTeam.value.id)
+            if (updatedTeam) {
+              selectedTeam.value = updatedTeam
+            } else {
+              // If team no longer exists, close the modal
+              showTeamDetails.value = false
+              selectedTeam.value = null
+            }
+          }
+          
+          // Show success message
+          alert('Player deleted successfully!')
+        } catch (err) {
+          console.error('Failed to delete player:', err)
+          alert(`Failed to delete player: ${err.message || 'Unknown error'}`)
+        } finally {
+          loading.value = false
+        }
+      }
+    }
+
     // Initialize component with optimized loading sequence
     onMounted(async () => {
       // Initialize auth first
@@ -789,7 +1049,17 @@ export default {
       getVisiblePlayers,
       viewTeamDetails,
       closeTeamDetails,
-      user
+      user,
+      // Add new player editing functions
+      editingPlayer,
+      showPlayerEditForm,
+      playerEditError,
+      playerEditLoading,
+      editPlayer,
+      cancelEditPlayer,
+      savePlayerEdit,
+      // Player deletion
+      confirmDeletePlayer
     }
   },
 }

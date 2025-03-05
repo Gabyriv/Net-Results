@@ -136,6 +136,117 @@ export function usePlayers() {
     }
   }
 
+  const createNewPlayer = async (playerData) => {
+    loading.value = true
+    error.value = null
+    try {
+      // Make sure we have a user and token
+      if (!user.value?.token) {
+        throw new Error('Authentication required')
+      }
+
+      const response = await axios.post(`${API_URL}/players`, playerData, {
+        headers: {
+          'Authorization': `Bearer ${user.value.token}`
+        },
+        withCredentials: true
+      })
+      
+      // Add the new player to the local array
+      players.value.push(response.data.data)
+      
+      return response.data.data
+    } catch (err) {
+      console.error('Error creating player:', err)
+      error.value = {
+        message: err.response?.data?.error || err.message || 'Failed to create player. Please try again later.'
+      }
+      throw error.value
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const updatePlayerById = async (playerId, playerData) => {
+    loading.value = true
+    error.value = null
+    try {
+      // Make sure we have a user and token
+      if (!user.value?.token) {
+        throw new Error('Authentication required')
+      }
+
+      console.log(`Updating player ${playerId} with data:`, playerData)
+
+      const response = await axios.put(`${API_URL}/players/${playerId}`, playerData, {
+        headers: {
+          'Authorization': `Bearer ${user.value.token}`
+        },
+        withCredentials: true
+      })
+      
+      console.log('API Response:', response.data)
+      
+      // Extract the player data from the response
+      const updatedPlayer = response.data.data || response.data
+      
+      // Update the player in the local array
+      const index = players.value.findIndex(p => p.id === playerId)
+      if (index !== -1) {
+        players.value[index] = updatedPlayer
+        console.log('Updated local player at index', index, ':', updatedPlayer)
+      } else {
+        console.log('Player not found in local array, fetching all players')
+        await fetchPlayers() // Refresh all players if we can't find this one
+      }
+      
+      return updatedPlayer
+    } catch (err) {
+      console.error('Error updating player:', err)
+      error.value = {
+        message: err.response?.data?.error || err.message || 'Failed to update player. Please try again later.'
+      }
+      throw error.value
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const deletePlayerById = async (playerId) => {
+    loading.value = true
+    error.value = null
+    try {
+      // Make sure we have a user and token
+      if (!user.value?.token) {
+        throw new Error('Authentication required')
+      }
+
+      console.log(`Deleting player with ID: ${playerId}`)
+
+      const response = await axios.delete(`${API_URL}/players/${playerId}`, {
+        headers: {
+          'Authorization': `Bearer ${user.value.token}`
+        },
+        withCredentials: true
+      })
+      
+      console.log(`Delete player response:`, response.data)
+      
+      // Remove the player from the local array
+      players.value = players.value.filter(p => p.id !== playerId)
+      
+      return true
+    } catch (err) {
+      console.error('Error deleting player:', err)
+      error.value = {
+        message: err.response?.data?.error || err.message || 'Failed to delete player. Please try again later.'
+      }
+      throw error.value
+    } finally {
+      loading.value = false
+    }
+  }
+
   return { 
     players, 
     teams,
@@ -144,6 +255,9 @@ export function usePlayers() {
     fetchPlayers,
     fetchTeams,
     assignPlayerToTeam,
-    removePlayerFromTeam
+    removePlayerFromTeam,
+    createNewPlayer,
+    updatePlayerById,
+    deletePlayerById
   }
 }

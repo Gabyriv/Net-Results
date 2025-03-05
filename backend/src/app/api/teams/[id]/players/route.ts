@@ -7,12 +7,12 @@ import { Role } from "@prisma/client";
 
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     return withAuth(request, async (session) => {
         try {
-            // Await the params.id to avoid Next.js warning
-            const teamId = await Promise.resolve(params.id);
+            // Await the params object first to get id
+            const { id: teamId } = await params;
             
             // Check if team exists
             const team = await prismaClient.team.findUnique({

@@ -8,12 +8,19 @@ import { PrismaClient } from "@prisma/client";
 // Type assertion to help TypeScript recognize the models
 const prismaClient = prisma as PrismaClient;
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     return withAuth(request, async () => {
         try {
-            // Await the params.id to avoid Next.js warning
-            const id = await Promise.resolve(params.id);
+            // Await the params object to get id
+            const { id } = await params;
             
+            if (!id) {
+                return NextResponse.json(
+                    { error: 'Invalid team ID' },
+                    { status: 400 }
+                );
+            }
+
             const team = await prismaClient.team.findUnique({
                 where: { id },
                 include: {
@@ -47,11 +54,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     });
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     return withAuth(request, async (session) => {
         try {
-            // Await the params.id to avoid Next.js warning
-            const id = await Promise.resolve(params.id);
+            // Await the params object to get id
+            const { id } = await params;
             
             if (!id) {
                 return NextResponse.json(
@@ -244,11 +251,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     });
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     return withAuth(request, async (session) => {
         try {
-            // Await the params.id to avoid Next.js warning
-            const id = await Promise.resolve(params.id);
+            // Await the params object to get id
+            const { id } = await params;
             
             if (!id) {
                 return NextResponse.json(
