@@ -56,6 +56,11 @@ model Game {
   oppTeam    String
   oppPts     Int
   sets       Int
+  setScores  String?  // JSON string of set scores
+  setsWon    String?  // JSON string of sets won by each team
+  isActive   Boolean  @default(false)
+  currentSet Int      @default(0)
+  servingTeam ServingTeam?
 }
 
 model PlayerStat {
@@ -82,4 +87,9 @@ model Stat {
 enum Role {
   Manager
   Player
+}
+
+enum ServingTeam {
+  Home
+  Away
 }
