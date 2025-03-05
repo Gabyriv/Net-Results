@@ -3,14 +3,26 @@ import { prisma } from "../../../config/prisma";
 import { handleServerError } from "../errors_handlers/server-errors";
 import { withAuth } from "../../../utils/auth-utils";
 import { PrismaClient } from "@prisma/client";
+import { GameSchema } from "../../../../types/types";
 
 // Type assertion to help TypeScript recognize the models
 const prismaClient = prisma as PrismaClient;
+
 
 export async function POST(request: Request) {
     return withAuth(request, async (session) => {
         try {
             const body = await request.json();
+            
+            // Validate the input data using Zod schema
+            const validationResult = GameSchema.safeParse(body);
+            
+            if (!validationResult.success) {
+                return NextResponse.json(
+                    { success: false, error: validationResult.error.format() },
+                    { status: 400 }
+                );
+            }
             
             // Get the next available ID
             const lastGame = await prismaClient.game.findFirst({
@@ -21,43 +33,31 @@ export async function POST(request: Request) {
             
             const nextId = lastGame ? lastGame.id + 1 : 1;
             
-            // Create the game with the required fields
+            // Create the game with the validated data
             const game = await prismaClient.game.create({
                 data: {
                     id: nextId,
-                    game: body.game,
-                    myTeam: body.myTeam,
-                    myPts: body.myPts,
-                    oppTeam: body.oppTeam,
-                    oppPts: body.oppPts,
-                    sets: body.sets,
-                    created_at: body.created_at ? new Date(body.created_at) : new Date()
+                    game: validationResult.data.game,
+                    myTeam: validationResult.data.myTeam,
+                    myPts: validationResult.data.myPts,
+                    oppTeam: validationResult.data.oppTeam,
+                    oppPts: validationResult.data.oppPts,
+                    sets: validationResult.data.sets,
+                    created_at: validationResult.data.created_at || new Date()
                 }
             });
 
-            return NextResponse.json({ success: true, data: game }, { status: 201 });
+            return NextResponse.json(
+                { success: true, data: game },
+                { status: 201 }
+            );
         } catch (error) {
             return handleServerError(error);
         }
     });
 }
 
-/**
- * @swagger
- * /api/games:
- *   get:
- *     summary: Get all games
- *     description: Retrieves a list of all games
- *     tags:
- *       - Games
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of games retrieved successfully
- *       401:
- *         description: Unauthorized
- */
+
 export async function GET(request: Request) {
     return withAuth(request, async () => {
         try {
