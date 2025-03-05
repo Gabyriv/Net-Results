@@ -67,7 +67,7 @@ export default {
       console.log('Login component mounted')
       if (isAuthenticated.value) {
         console.log('User is already authenticated, redirecting to dashboard')
-        router.push('/dashboard')
+        router.push('/home')
       }
     })
 
