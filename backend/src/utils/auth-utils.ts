@@ -29,24 +29,50 @@ export async function checkRole(request: Request | NextApiRequest |null, require
     try {
         console.log('checkRole: Creating Supabase client')
         // Create Supabase server client
-        const supabase = await createClient()
+        const supabase = await createClient(null)
         console.log('checkRole: Supabase client created')
         
         // Get token from request cookies or Authorization header
         let token = null
         if (request) {
-            // Try to get token from cookies
-            const cookieHeader = request.headers.get('cookie')
-            if (cookieHeader) {
-                const cookies = parse(cookieHeader)
-                token = cookies.auth_token
-            }
-            
-            // If no token in cookies, try Authorization header
-            if (!token) {
-                const authHeader = request.headers.get('Authorization')
-                if (authHeader && authHeader.startsWith('Bearer ')) {
-                    token = authHeader.substring(7)
+            // Handle different request types appropriately
+            if ('headers' in request && request.headers instanceof Headers) {
+                // Next.js App Router Request
+                // Try to get token from cookies
+                const cookieHeader = request.headers.get('cookie')
+                if (cookieHeader) {
+                    const cookies = parse(cookieHeader)
+                    token = cookies.auth_token
+                }
+                
+                // If no token in cookies, try Authorization header
+                if (!token) {
+                    const authHeader = request.headers.get('Authorization')
+                    if (authHeader && authHeader.startsWith('Bearer ')) {
+                        token = authHeader.substring(7)
+                    }
+                }
+            } else if ('headers' in request && typeof request.headers === 'object') {
+                // NextApiRequest (Pages Router)
+                // Try to get token from cookies
+                if ('cookie' in request.headers && request.headers.cookie) {
+                    const cookies = parse(
+                        Array.isArray(request.headers.cookie) 
+                            ? request.headers.cookie[0] 
+                            : request.headers.cookie
+                    )
+                    token = cookies.auth_token
+                }
+                
+                // If no token in cookies, try Authorization header
+                if (!token && 'authorization' in request.headers && request.headers.authorization) {
+                    const authHeader = Array.isArray(request.headers.authorization) 
+                        ? request.headers.authorization[0] 
+                        : request.headers.authorization
+                    
+                    if (authHeader && authHeader.startsWith('Bearer ')) {
+                        token = authHeader.substring(7)
+                    }
                 }
             }
         }
@@ -167,12 +193,15 @@ export async function withAuth<T>(
     // Execute the handler with the session information
     try {
         console.log('withAuth: Executing handler')
-        return await handler({
-            userId,
-            userEmail,
-            userRole,
-            userMetadata
-        });
+        // Wrap the handler execution in a Promise.resolve to ensure all dynamic params are awaited
+        return await Promise.resolve().then(() => 
+            handler({
+                userId,
+                userEmail,
+                userRole,
+                userMetadata
+            })
+        );
     } catch (error) {
         console.error('withAuth: Error in handler:', error);
         if (error instanceof Error) {
@@ -206,7 +235,7 @@ export function getTokenFromRequest(request: Request | NextApiRequest | null): s
         if (!token && authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
             token = authHeader.substring(7);
         }
-    } else {
+    } else if ('headers' in request && request.headers instanceof Headers) {
         // Regular Request from App Router
         // Get token from cookie
         const cookieHeader = request.headers.get('cookie');

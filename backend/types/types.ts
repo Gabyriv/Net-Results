@@ -62,24 +62,33 @@ export const PlayerUpdateSchema = z.object({
 
 // Game schemas
 export const GameSchema = z.object({
-  id: z.string().optional(),
-  date: z.string(),
-  location: z.string(),
-  homeTeamId: z.string(),
-  awayTeamId: z.string(),
-  homeTeamScore: z.number().int().default(0),
-  awayTeamScore: z.number().int().default(0),
-  status: z.enum(["scheduled", "in_progress", "completed"]).default("scheduled"),
+  id: z.number().int().optional(),
+  created_at: z.date().optional().default(new Date()),
+  game: z.string(),
+  myTeam: z.string(),
+  myPts: z.number().int().default(0),
+  oppTeam: z.string(),
+  oppPts: z.number().int().default(0),
+  sets: z.number().int(),
+  setScores: z.string().optional(),
+  setsWon: z.string().optional(),
+  isActive: z.boolean().optional().default(false),
+  currentSet: z.number().int().optional().default(0),
+  servingTeam: z.string().optional()
 });
 
 export const GameUpdateSchema = z.object({
-  date: z.string().optional(),
-  location: z.string().optional(),
-  homeTeamId: z.string().optional(),
-  awayTeamId: z.string().optional(),
-  homeTeamScore: z.number().int().optional(),
-  awayTeamScore: z.number().int().optional(),
-  status: z.enum(["scheduled", "in_progress", "completed"]).optional(),
+  game: z.string().optional(),
+  myTeam: z.string().optional(),
+  myPts: z.number().int().optional(),
+  oppTeam: z.string().optional(),
+  oppPts: z.number().int().optional(),
+  sets: z.number().int().optional(),
+  setScores: z.string().optional(),
+  setsWon: z.string().optional(),
+  isActive: z.boolean().optional(),
+  currentSet: z.number().int().optional(),
+  servingTeam: z.string().optional()
 });
 
 // PlayerStat schemas

@@ -49,6 +49,12 @@ const routes = [
   { path: '/home', name: 'Home', component: Home },
   { path: '/api-test', name: 'ApiTest', component: FetchApi },
   { path: '/api-connection', name: 'ApiConnection', component: FetchData },
+  {
+    path: '/game-tracking',
+    name: 'GameTracking',
+    component: () => import('../pages/GameTrackingPage.vue'),
+    meta: { requiresAuth: true }
+  },
 ]
 
 const router = createRouter({
