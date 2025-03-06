@@ -165,6 +165,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import DashboardLayout from '../layouts/DashboardLayout.vue'
 import { useGames } from '../composable/useGames'
+import { useRouter } from 'vue-router'
 
 export default {
   name: 'Matches',
@@ -175,6 +176,7 @@ export default {
     const { games, loading, error, fetchGames, createGame } = useGames()
     const searchQuery = ref('')
     const showCreateForm = ref(false)
+    const router = useRouter()
     
     // New game form data
     const newGame = ref({
@@ -237,14 +239,25 @@ export default {
         const gameData = {
           ...newGame.value,
           myPts: 0,
-          oppPts: 0
+          oppPts: 0,
+          // ServingTeam will use the database default
+          // Initialize empty JSON strings for new fields
+          setScores: '{}',
+          setsWon: '{"home":0,"away":0}',
+          currentSet: 1,
+          isActive: true
         }
+        
+        console.log('Sending game data without servingTeam to use default:', gameData);
         
         const result = await createGame(gameData)
         if (result) {
           // Reset form and close modal on success
           resetForm()
           showCreateForm.value = false
+          
+          // Redirect to the volleyball scoring page for the new game
+          router.push(`/volleyball-scoring/${result.id}`)
         }
       } catch (err) {
         console.error('Error in form submission:', err)

@@ -72,12 +72,19 @@ export default {
       error.value = null
       
       try {
-        // Get game ID from route params
-        gameId.value = parseInt(route.params.id)
+        // Get game ID from route params and ensure it's a valid number
+        const id = route.params.id
+        if (!id) {
+          throw new Error('Game ID is missing')
+        }
+        
+        gameId.value = parseInt(id)
         
         if (isNaN(gameId.value)) {
-          throw new Error('Invalid game ID')
+          throw new Error('Invalid game ID format')
         }
+        
+        console.log('Loading game with ID:', gameId.value)
         
         // Fetch game data
         const gameData = await fetchGameById(gameId.value)
@@ -89,7 +96,7 @@ export default {
         }
       } catch (err) {
         console.error('Error loading game:', err)
-        error.value = 'Failed to load game. Please try again.'
+        error.value = `Failed to load game: ${err.message || 'Unknown error'}`
       } finally {
         loading.value = false
       }

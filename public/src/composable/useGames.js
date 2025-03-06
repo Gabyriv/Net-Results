@@ -74,6 +74,9 @@ export function useGames() {
     try {
       console.log('Creating game with data:', gameData);
       
+      // Use the provided data without additional transformation
+      // The calling component should provide all fields in the correct format
+      
       // Use the unauthenticated endpoint for creating games
       const response = await axios.post(`${API_URL}/games/create`, gameData)
       
@@ -91,13 +94,37 @@ export function useGames() {
       if (err.response) {
         console.error('Response status:', err.response.status);
         console.error('Response data:', err.response.data);
-        error.value = err.response.data?.error || 'Failed to create game. Please try again.';
+        
+        // Extract the detailed error message
+        const errorData = err.response.data;
+        let errorMessage;
+        
+        if (errorData && errorData.error) {
+          // Handle various error formats
+          if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else if (typeof errorData.error === 'object') {
+            // Handle nested error objects (like validation errors)
+            errorMessage = 'Validation error: ';
+            for (const field in errorData.error) {
+              if (errorData.error[field]._errors) {
+                errorMessage += `${field}: ${errorData.error[field]._errors.join(', ')}. `;
+              }
+            }
+          } else {
+            errorMessage = 'Failed to create game. Please try again.';
+          }
+        } else {
+          errorMessage = 'Server error. Please try again.';
+        }
+        
+        error.value = errorMessage;
       } else if (err.request) {
         console.error('No response received:', err.request);
         error.value = 'Server did not respond. Please check your connection and try again.';
       } else {
         console.error('Error message:', err.message);
-        error.value = 'Failed to create game. Please try again.';
+        error.value = err.message || 'Failed to create game. Please try again.';
       }
       
       return null
@@ -117,7 +144,8 @@ export function useGames() {
     error.value = null
     
     try {
-      const response = await axios.put(`${API_URL}/games/${id}/score`, gameData)
+      // Update to use the correct endpoint without /score
+      const response = await axios.put(`${API_URL}/games/${id}`, gameData)
       
       if (response.data && response.data.success) {
         // Update the game in the games array

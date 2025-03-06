@@ -7,62 +7,73 @@ type ErrorResponse = {
     details?: any;
 }
 
-export function handleServerError(error: unknown): NextResponse<ErrorResponse> {
-    // Ensure error is not null or undefined
-    if (!error) {
+/**
+ * Handle server errors and return appropriate JSON responses
+ * @param error - The error object
+ * @returns NextResponse with appropriate status code and error message
+ */
+export function handleServerError(error: unknown): NextResponse {
+    // Ensure we have a non-null error object to work with
+    if (error === null || error === undefined) {
         return NextResponse.json(
-            { error: 'An unknown error occurred' },
+            { error: "Unknown server error occurred" } as ErrorResponse,
             { status: 500 }
         );
     }
 
-    // Log the error safely without trying to stringify it directly
+    // Safely log the error, avoiding direct console.error on the error object
+    // which can cause issues with null payload serialization
     if (error instanceof Error) {
-        console.error('Server error:', error.message);
+        console.log(`Server error: ${error.name} - ${error.message}`);
     } else {
-        console.error('Server error: Unknown error type');
+        console.log(`Unknown server error type occurred`);
     }
 
+    // Handle specific error types
     if (error instanceof ZodError) {
-        // Handle validation errors
+        // Validation error
         return NextResponse.json(
-            { error: 'Validation error', details: error.errors },
+            { error: "Validation error", details: error.format() } as ErrorResponse,
             { status: 400 }
         );
-    }
-
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        switch (error.code) {
-            case 'P2002':
-                return NextResponse.json(
-                    { error: 'Email already exists' },
-                    { status: 409 }
-                )
-            case 'P2025':
-                return NextResponse.json(
-                    { error: 'Resource not found' },
-                    { status: 404 }
-                )
-            default:
-                return NextResponse.json(
-                    { error: 'Database error', details: error.message },
-                    { status: 500 }
-                )
+    } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        // Prisma known error (e.g. unique constraint violation)
+        let errorMessage = "Database error";
+        
+        // Handle common Prisma error codes
+        if (error.code === "P2002") {
+            errorMessage = "A record with this value already exists";
+        } else if (error.code === "P2025") {
+            errorMessage = "Record not found";
         }
-    }
-
-    if (error instanceof Prisma.PrismaClientValidationError) {
+        
         return NextResponse.json(
-            { error: 'Invalid data format' },
+            { 
+                error: errorMessage, 
+                details: { 
+                    code: error.code, 
+                    meta: error.meta 
+                } 
+            } as ErrorResponse,
             { status: 400 }
-        )
+        );
+    } else if (error instanceof Prisma.PrismaClientValidationError) {
+        // Prisma validation error
+        return NextResponse.json(
+            { error: "Invalid data format for database operation" } as ErrorResponse,
+            { status: 400 }
+        );
+    } else if (error instanceof Error) {
+        // Generic error with message
+        return NextResponse.json(
+            { error: error.message || "Server error occurred" } as ErrorResponse,
+            { status: 500 }
+        );
+    } else {
+        // Unknown error type
+        return NextResponse.json(
+            { error: "Unknown server error occurred" } as ErrorResponse,
+            { status: 500 }
+        );
     }
-
-    // Handle other types of errors
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    
-    return NextResponse.json(
-        { error: errorMessage },
-        { status: 500 }
-    );
 } 

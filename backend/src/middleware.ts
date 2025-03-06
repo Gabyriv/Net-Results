@@ -34,25 +34,17 @@ export async function middleware(request: NextRequest) {
   
   // Log incoming request in production (but not health checks to avoid log spam)
   if (process.env.NODE_ENV === 'production' && !url.includes('/api/health')) {
-    logger.info({
-      message: 'Incoming request',
-      method: request.method,
-      url,
-      requestId,
-      ip: request.ip || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown'
-    });
+    logger.info(
+      `Incoming request: ${request.method} ${url} from ${request.headers.get('x-forwarded-for') || 'unknown'}`
+    );
   }
   
   try {
     // Check for suspicious patterns in request
     if (detectSuspiciousPatterns(request)) {
-      logger.warn({
-        message: 'Suspicious request pattern detected',
-        requestId,
-        url,
-        ip: request.ip || 'unknown'
-      });
+      logger.warn(
+        `Suspicious request pattern detected: ${url} from ${request.headers.get('x-forwarded-for') || 'unknown'}`
+      );
       return NextResponse.json(
         { error: 'Bad request' },
         { status: 400 }
@@ -65,11 +57,12 @@ export async function middleware(request: NextRequest) {
       if (response) return response;
     }
 
-    // Apply CORS headers for API routes
+    // For API routes, handle CORS properly
     if (request.nextUrl.pathname.startsWith('/api/')) {
+      const origin = getAllowedOrigin(request);
+      
       // For OPTIONS requests (preflight), return immediately with CORS headers
       if (request.method === 'OPTIONS') {
-        const origin = getAllowedOrigin(request);
         console.log('CORS preflight request from origin:', origin);
         
         return new NextResponse(null, {
@@ -85,52 +78,58 @@ export async function middleware(request: NextRequest) {
         });
       }
       
-      // For regular API requests, continue but we'll add CORS headers to the response
+      // For API routes, continue with the request
+      // The response will be handled by the API route handler
+      const response = await updateSession(request);
+      
+      // If it's a response from the updateSession (like a redirect or error),
+      // add CORS headers to it and return
+      if (response.status !== 200) {
+        const headers = new Headers(response.headers);
+        headers.set('Access-Control-Allow-Origin', origin);
+        headers.set('Access-Control-Allow-Credentials', 'true');
+        headers.set('Vary', 'Origin');
+        
+        return new NextResponse(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers
+        });
+      }
+      
+      // Otherwise continue with the request to the API route
+      // The NextResponse.next() will allow the request to proceed to the API route
+      const modifiedRequest = {
+        ...request,
+        headers: requestHeaders
+      };
+      
+      return NextResponse.next({
+        request: modifiedRequest
+      });
     }
     
-    // Apply security headers to all responses
+    // For non-API routes, proceed with regular session handling
     const response = await updateSession(request);
     
     // Add security headers
     const responseHeaders = new Headers(response.headers);
     addSecurityHeaders(responseHeaders);
     
-    // Add timing headers in development mode
-    if (process.env.NODE_ENV !== 'production') {
-      const endTime = Date.now();
-      responseHeaders.set('Server-Timing', `total;dur=${endTime - startTime}`);
-    }
-    
     // Add request ID to response for tracking
     responseHeaders.set('x-request-id', requestId);
     
-    // Add CORS headers for API routes
-    if (request.nextUrl.pathname.startsWith('/api/')) {
-      const origin = getAllowedOrigin(request);
-      console.log('Adding CORS headers for origin:', origin);
-      
-      responseHeaders.set('Access-Control-Allow-Origin', origin);
-      responseHeaders.set('Access-Control-Allow-Credentials', 'true');
-      responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Request-ID, Cookie');
-      responseHeaders.set('Vary', 'Origin');
-    }
-    
     // Return the modified response
-    return NextResponse.json(
-      response.json ? await response.json() : undefined,
-      {
-        status: response.status,
-        statusText: response.statusText,
-        headers: responseHeaders,
-      }
-    );
-  } catch (error) {
-    logger.error({
-      message: 'Middleware error',
-      error: error instanceof Error ? error.message : String(error),
-      requestId,
-      url
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+      headers: responseHeaders,
     });
+  } catch (error) {
+    logger.error(
+      `Middleware error: ${error instanceof Error ? error.message : String(error)} for ${url}`
+    );
     
     // Return a generic error to avoid leaking information
     return NextResponse.json(
@@ -145,7 +144,7 @@ export async function middleware(request: NextRequest) {
  */
 function applyRateLimit(request: NextRequest): NextResponse | null {
   // Get client IP
-  const ip = request.ip || 'unknown';
+  const ip = request.headers.get('x-forwarded-for') || 'unknown';
   
   // Skip rate limiting for health checks
   if (request.nextUrl.pathname === '/api/health') {
@@ -178,12 +177,9 @@ function applyRateLimit(request: NextRequest): NextResponse | null {
   if (ipData.count > RATE_LIMIT_MAX) {
     // Log rate limit exceeded in production
     if (process.env.NODE_ENV === 'production') {
-      logger.warn({
-        message: 'Rate limit exceeded',
-        ip,
-        path: request.nextUrl.pathname,
-        userAgent: request.headers.get('user-agent') || 'unknown'
-      });
+      logger.warn(
+        `Rate limit exceeded: ${request.nextUrl.pathname} from ${ip}`
+      );
     }
     
     return NextResponse.json(
@@ -208,8 +204,6 @@ function applyRateLimit(request: NextRequest): NextResponse | null {
 
   return null;
 }
-
-// This function is no longer used as we've moved the CORS handling directly into the middleware function
 
 /**
  * Get the allowed origin based on the environment
@@ -239,49 +233,42 @@ function getAllowedOrigin(request: NextRequest): string {
         allowedOrigins = [...allowedOrigins, ...additionalOrigins];
       }
     } catch (error) {
-      logger.error({
-        message: 'Failed to parse ADDITIONAL_ALLOWED_ORIGINS',
-        error: error instanceof Error ? error.message : String(error)
-      });
+      logger.error(
+        `Failed to parse ADDITIONAL_ALLOWED_ORIGINS: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   
   // Filter out empty values
   allowedOrigins = allowedOrigins.filter(Boolean);
-
-  // In production, only allow specific origins
-  if (process.env.NODE_ENV === 'production') {
-    return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  
+  // Check if the request origin is in the allowed list
+  if (allowedOrigins.includes(origin)) {
+    return origin;
   }
-
-  // In development, allow any origin
-  return origin || '*';
+  
+  // If not in the allowed list, use the first allowed origin as fallback
+  // This is safer than using '*' which allows any site to make requests
+  return allowedOrigins[0] || 'http://localhost:5173';
 }
 
 /**
- * Add security headers to the response
+ * Add security headers to response
  */
 function addSecurityHeaders(headers: Headers): void {
-  // Content Security Policy
-  const cspValue = process.env.NODE_ENV === 'production'
-    ? "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co; frame-ancestors 'none';"
-    : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co ws:; frame-ancestors 'none';"
-  
-  headers.set('Content-Security-Policy', cspValue);
-  headers.set('X-Content-Type-Options', 'nosniff');
-  headers.set('X-Frame-Options', 'DENY');
+  // Common security headers
   headers.set('X-XSS-Protection', '1; mode=block');
+  headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   
-  // Only in production
-  if (process.env.NODE_ENV === 'production') {
-    headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-    
-    // Add Permissions-Policy to limit features
-    headers.set(
-      'Permissions-Policy',
-      'camera=(), microphone=(), geolocation=(), interest-cohort=()'
-    );
+  // Add Content-Security-Policy if not already set
+  if (!headers.has('Content-Security-Policy')) {
+    headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co;");
+  }
+  
+  // Add Permissions-Policy if not already set
+  if (!headers.has('Permissions-Policy')) {
+    headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   }
 }
 
@@ -290,14 +277,18 @@ function addSecurityHeaders(headers: Headers): void {
  */
 function detectSuspiciousPatterns(request: NextRequest): boolean {
   const url = request.nextUrl.toString();
-  const body = request.body ? String(request.body) : '';
-  const headers = Object.fromEntries(request.headers.entries());
+  const body = request.body ? 'yes' : 'no'; // We can't read the body here, just check if it exists
   
-  // Combine all request data for inspection
-  const requestData = `${url}|${body}|${JSON.stringify(headers)}`;
+  // Check URL against suspicious patterns
+  for (const pattern of SUSPICIOUS_PATTERNS) {
+    if (pattern.test(url)) {
+      return true;
+    }
+  }
   
-  // Check against suspicious patterns
-  return SUSPICIOUS_PATTERNS.some(pattern => pattern.test(requestData));
+  // Additional checks could be added here
+  
+  return false;
 }
 
 // Configure which paths should be processed by this middleware

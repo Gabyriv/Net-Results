@@ -20,7 +20,7 @@ model User {
 }
 
 model Manager {
-  id          String   @id @unique
+  id          String @id @unique
   displayName String
   userId      String @unique
   user        User   @relation(fields: [userId], references: [id])
@@ -48,19 +48,19 @@ model Player {
 }
 
 model Game {
-  id         Int      @id @unique
-  created_at DateTime @default(now())
-  game       String
-  myTeam     String
-  myPts      Int
-  oppTeam    String
-  oppPts     Int
-  sets       Int
-  setScores  String?  // JSON string of set scores
-  setsWon    String?  // JSON string of sets won by each team
-  isActive   Boolean  @default(false)
-  currentSet Int      @default(0)
-  servingTeam ServingTeam?
+  id          Int          @id @unique
+  created_at  DateTime     @default(now())
+  game        String
+  myTeam      String
+  myPts       Int
+  oppTeam     String
+  oppPts      Int
+  sets        Int
+  setScores   Json?
+  setsWon     Json?
+  isActive    Boolean      @default(false)
+  currentSet  Int          @default(0) @db.SmallInt
+  servingTeam ServingTeam? @default(Home)
 }
 
 model PlayerStat {
@@ -72,7 +72,6 @@ model PlayerStat {
   statId     Int
   player     Player   @relation(fields: [playerId], references: [id])
   stat       Stat     @relation(fields: [statId], references: [id])
-
 
   @@index([playerId])
   @@index([statId])

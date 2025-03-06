@@ -310,81 +310,189 @@ export default {
       }
     }
     
-    // Save the game state
-    const saveGame = async () => {
-      isSaving.value = true
-      
-      try {
-        // Calculate total points from set history and current set
-        let myTotalPts = currentSet.homeScore
-        let oppTotalPts = currentSet.awayScore
-        
-        setHistory.value.forEach(set => {
-          myTotalPts += set.homeScore
-          oppTotalPts += set.awayScore
-        })
-        
-        // Update the game data
-        const gameData = {
-          id: game.value.id,
-          myPts: myTotalPts,
-          oppPts: oppTotalPts,
-          setScores: JSON.stringify([...setHistory.value, {
-            homeScore: currentSet.homeScore,
-            awayScore: currentSet.awayScore,
-            inProgress: true
-          }]),
-          setsWon: JSON.stringify(setsWon.value)
-        }
-        
-        await updateGameScore(game.value.id, gameData)
-        emit('updated', gameData)
-      } catch (error) {
-        console.error('Failed to save game:', error)
-        alert('Failed to save game. Please try again.')
-      } finally {
-        isSaving.value = false
-      }
-    }
-    
     // Load game data
     const loadGame = async () => {
+      if (!props.gameId) {
+        console.error('Cannot load game: No gameId provided', props.gameId)
+        return
+      }
+      
+      console.log('Loading game data for ID:', props.gameId)
+      
       try {
         // Fetch the game
         const gameData = await realtimeService.getGameState(props.gameId)
         
         if (gameData) {
           game.value = gameData
+          console.log('Loaded game data:', gameData)
           
           // If we have set scores saved, restore them
           if (gameData.setScores) {
             try {
-              const scores = JSON.parse(gameData.setScores)
+              // Handle different formats of setScores (string, object, or array)
+              let scores;
               
-              // Last set is the current set
-              const lastSet = scores.pop()
-              
-              if (lastSet) {
-                if (lastSet.inProgress) {
-                  // Restore the current set
-                  currentSet.homeScore = lastSet.homeScore
-                  currentSet.awayScore = lastSet.awayScore
-                } else {
-                  // It's a completed set, add to history
-                  scores.push(lastSet)
-                }
+              if (typeof gameData.setScores === 'string') {
+                // If it's a string, try to parse it
+                scores = JSON.parse(gameData.setScores);
+                console.log('Parsed setScores from string:', scores);
+              } else if (typeof gameData.setScores === 'object') {
+                // If it's already an object (from Prisma's JSON fields)
+                scores = gameData.setScores;
+                console.log('Using setScores as object:', scores);
+              } else {
+                console.warn('Unexpected setScores data type:', typeof gameData.setScores);
+                scores = [];
               }
               
-              setHistory.value = scores
-              currentSetIndex.value = scores.length
+              // Ensure it's an array
+              if (!Array.isArray(scores)) {
+                console.warn('setScores is not an array, using empty array instead:', scores);
+                scores = [];
+              }
+              
+              // Handle the set history
+              if (scores.length > 0) {
+                // Last set is the current set
+                const lastSet = scores.pop();
+                
+                if (lastSet) {
+                  if (lastSet.inProgress) {
+                    // Restore the current set
+                    currentSet.homeScore = lastSet.homeScore || 0;
+                    currentSet.awayScore = lastSet.awayScore || 0;
+                    console.log('Restored current set:', currentSet);
+                  } else {
+                    // It's a completed set, add to history
+                    scores.push(lastSet);
+                    console.log('Added complete set to history');
+                  }
+                }
+                
+                setHistory.value = scores;
+                currentSetIndex.value = scores.length;
+                console.log('Set history updated, current set index:', currentSetIndex.value);
+              }
             } catch (e) {
-              console.error('Error parsing set scores:', e)
+              console.error('Error processing set scores:', e);
+            }
+          }
+          
+          // Process setsWon data if available
+          if (gameData.setsWon) {
+            try {
+              let setsWonData;
+              
+              if (typeof gameData.setsWon === 'string') {
+                setsWonData = JSON.parse(gameData.setsWon);
+                console.log('Parsed setsWon from string:', setsWonData);
+              } else if (typeof gameData.setsWon === 'object') {
+                setsWonData = gameData.setsWon;
+                console.log('Using setsWon as object:', setsWonData);
+              }
+              
+              // We don't need to update setsWon since it's a computed property
+              // that's calculated from setHistory
+            } catch (e) {
+              console.error('Error processing setsWon data:', e);
             }
           }
         }
       } catch (error) {
-        console.error('Error loading game:', error)
-        alert('Error loading game data. Please try refreshing the page.')
+        console.error('Error loading game:', error);
+        alert('Error loading game data. Please try refreshing the page.');
+      }
+    }
+    
+    // Save the game state
+    const saveGame = async () => {
+      if (!props.gameId) {
+        console.error('Cannot save game: No gameId provided', props.gameId);
+        alert('Error: Game ID is missing. Please refresh the page and try again.');
+        return;
+      }
+      
+      isSaving.value = true;
+      console.log('Saving game with ID:', props.gameId);
+      
+      try {
+        // Calculate total points from set history and current set
+        let myTotalPts = currentSet.homeScore;
+        let oppTotalPts = currentSet.awayScore;
+        
+        setHistory.value.forEach(set => {
+          myTotalPts += set.homeScore;
+          oppTotalPts += set.awayScore;
+        });
+        
+        // Create an array of all sets including current
+        const allSets = [
+          ...setHistory.value, 
+          {
+            homeScore: currentSet.homeScore,
+            awayScore: currentSet.awayScore,
+            inProgress: true
+          }
+        ];
+        
+        // Ensure all numeric values are proper numbers
+        const gameId = parseInt(props.gameId);
+        const myPts = Number(myTotalPts);
+        const oppPts = Number(oppTotalPts);
+        const currentSetNum = Number(currentSetIndex.value + 1);
+        
+        // Make sure setScores is a proper array before stringifying
+        let setScoresString;
+        try {
+          // First ensure we have a valid array
+          const validSets = allSets.map(set => ({
+            homeScore: Number(set.homeScore || 0),
+            awayScore: Number(set.awayScore || 0),
+            inProgress: !!set.inProgress
+          }));
+          setScoresString = JSON.stringify(validSets);
+          console.log('Formatted setScores as JSON string:', setScoresString);
+        } catch (e) {
+          console.error('Error stringifying setScores:', e);
+          setScoresString = '[]'; // Fallback to empty array
+        }
+        
+        // Make sure setsWon is a proper object
+        let setsWonString;
+        try {
+          const validSetsWon = {
+            home: Number(setsWon.value.home || 0),
+            away: Number(setsWon.value.away || 0)
+          };
+          setsWonString = JSON.stringify(validSetsWon);
+          console.log('Formatted setsWon as JSON string:', setsWonString);
+        } catch (e) {
+          console.error('Error stringifying setsWon:', e);
+          setsWonString = '{"home":0,"away":0}'; // Fallback to zeros
+        }
+        
+        // Update the game data - only include fields defined in GameUpdateSchema
+        const gameData = {
+          myPts,
+          oppPts,
+          setScores: setScoresString,
+          setsWon: setsWonString,
+          currentSet: currentSetNum
+        };
+        
+        console.log('Updating game with data:', gameData);
+        const updatedGame = await realtimeService.updateGame(gameId, gameData);
+        
+        if (updatedGame) {
+          console.log('Game updated successfully:', updatedGame);
+          emit('updated', updatedGame);
+        }
+      } catch (error) {
+        console.error('Failed to save game:', error);
+        alert('Failed to save game. Please try again.');
+      } finally {
+        isSaving.value = false;
       }
     }
     
@@ -392,35 +500,22 @@ export default {
     let subscription = null
     
     const setupRealtimeSubscription = () => {
+      if (!props.gameId) {
+        console.error('Cannot set up subscription: Invalid gameId', props.gameId)
+        return
+      }
+      
+      console.log('Setting up realtime subscription for game ID:', props.gameId)
+      
       subscription = realtimeService.subscribeToGame(props.gameId, (updatedGame) => {
         // Only update if this is not our own update
         if (!isSaving.value) {
+          console.log('Received real-time update for game:', updatedGame);
           game.value = updatedGame
           
-          // Check if we need to update scores
-          if (updatedGame.setScores) {
-            try {
-              const scores = JSON.parse(updatedGame.setScores)
-              // Last set is the current set if it's marked as in progress
-              const lastSet = scores[scores.length - 1]
-              
-              if (lastSet && lastSet.inProgress) {
-                // Restore the current set if it differs from our current state
-                if (lastSet.homeScore !== currentSet.homeScore || 
-                    lastSet.awayScore !== currentSet.awayScore) {
-                  currentSet.homeScore = lastSet.homeScore
-                  currentSet.awayScore = lastSet.awayScore
-                }
-                
-                // Remove the in-progress set for history
-                setHistory.value = scores.slice(0, -1)
-              } else {
-                setHistory.value = scores
-              }
-            } catch (e) {
-              console.error('Error parsing updated set scores:', e)
-            }
-          }
+          // We don't need to manually update scores since loadGame will handle it
+          // when we call it with the updated game data
+          loadGame();
         }
       })
     }

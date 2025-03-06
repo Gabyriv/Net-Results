@@ -11,6 +11,7 @@ const Login = () => import('../pages/Login.vue')
 const Register = () => import('../pages/Register.vue')
 const FetchApi = () => import('../components/FetchApi.vue')
 const FetchData = () => import('../components/FetchData.vue')
+const VolleyballScoring = () => import('../pages/VolleyballScoring.vue')
 
 const routes = [
   { path: '/' , redirect: '/home' },
@@ -53,6 +54,13 @@ const routes = [
     path: '/game-tracking',
     name: 'GameTracking',
     component: () => import('../pages/GameTrackingPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/volleyball-scoring/:id',
+    name: 'VolleyballScoring',
+    component: VolleyballScoring,
+    props: true,
     meta: { requiresAuth: true }
   },
 ]
