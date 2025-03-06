@@ -131,7 +131,7 @@ export function useAuth() {
         
         if (loginResult.success) {
           console.log('Auto-login successful, redirecting to dashboard')
-          router.push('/dashboard')
+          router.push('/teams')
           return { success: true, data: response.data }
         } else {
           console.warn('Auto-login failed, redirecting to login page')
@@ -217,8 +217,8 @@ export function useAuth() {
       // Also set the token in a cookie
       document.cookie = `auth_token=${user.value.token}; path=/; max-age=${7 * 24 * 60 * 60}; ${location.protocol === 'https:' ? 'secure; samesite=lax' : ''}`
       
-      // Redirect to dashboard after successful login
-      router.push('/')
+      // Redirect to teams page after successful login
+      router.push('/teams')
       
       return { success: true }
     } catch (error) {

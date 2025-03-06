@@ -15,8 +15,15 @@ export default {
   name: 'StatCard',
   props: {
     title: String,
-    value: Number,
+    value: {
+      type: [Number, String],
+      required: true
+    },
     icon: String,
+    color: {
+      type: String,
+      default: 'text-blue-500'
+    }
   },
 }
 </script>

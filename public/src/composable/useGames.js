@@ -166,6 +166,34 @@ export function useGames() {
     }
   }
 
+  /**
+   * Delete a game
+   * @param {number} id - Game ID to delete
+   * @returns {Promise<boolean>} - Success status
+   */
+  const deleteGame = async (id) => {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await axios.delete(`${API_URL}/games/${id}`)
+      
+      if (response.data && response.data.success) {
+        // Remove the game from the games array
+        games.value = games.value.filter(game => game.id !== id)
+        return true
+      } else {
+        throw new Error(response.data?.error || 'Failed to delete game')
+      }
+    } catch (err) {
+      console.error(`Error deleting game ${id}:`, err)
+      error.value = err.response?.data?.error || 'Failed to delete game. Please try again.'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     games,
     loading, 
@@ -173,6 +201,7 @@ export function useGames() {
     fetchGames,
     fetchGameById,
     createGame,
-    updateGameScore
+    updateGameScore,
+    deleteGame
   }
 } 

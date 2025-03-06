@@ -13,9 +13,6 @@
         <li>
           <router-link to="/teams" class="text-xl text-white hover:text-gray-200 transition duration-300">Teams</router-link>
         </li>
-        <li>
-          <router-link to="/api-connection" class="text-xl text-white hover:text-gray-200 transition duration-300">API Test</router-link>
-        </li>
         <li v-if="user" class="text-xl text-yellow-200">
           {{ user.displayName }}
         </li>

@@ -7,7 +7,15 @@
         @before-leave="beforeLeave"
         @enter="enter"
       >
-        <component :is="Component" />
+        <keep-alive>
+          <div>
+            <component :is="Component" v-if="authInitialized" />
+            <div v-else class="loading-indicator">
+              <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+              <p class="mt-4 text-gray-600">Loading application...</p>
+            </div>
+          </div>
+        </keep-alive>
       </transition>
     </router-view>
   </div>
@@ -79,5 +87,14 @@ html {
 /* Prevent FOUC (Flash of Unstyled Content) */
 .router-link-active {
   font-weight: bold;
+}
+
+/* Loading indicator styles */
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
 }
 </style>

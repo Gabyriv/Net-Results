@@ -153,8 +153,8 @@ router.beforeEach(async (to, from, next) => {
       replace: true 
     })
   } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated) {
-    // If user is already authenticated and tries to access login/register, redirect to dashboard
-    next({ path: '/dashboard', replace: true })
+    // If user is already authenticated and tries to access login/register, redirect to teams page
+    next({ path: '/teams', replace: true })
   } else {
     // Otherwise proceed as normal
     next()
