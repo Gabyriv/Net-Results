@@ -172,12 +172,15 @@ export default {
     const fetchGames = async () => {
       isLoading.value = true;
       try {
-        // If a team is selected, get games for that team
+        // Always use getMyGames to get only the user's games
+        const allGames = await gameService.getMyGames();
+        
+        // If a team is selected, filter the games for that team
         if (selectedTeam.value) {
-          games.value = await gameService.getGamesByTeam(selectedTeam.value.name);
+          games.value = allGames.filter(game => game.myTeam === selectedTeam.value.name);
         } else {
-          // Otherwise get all games
-          games.value = await gameService.getAllGames();
+          // Otherwise, use all of the user's games
+          games.value = allGames;
         }
       } catch (error) {
         console.error('Error fetching games:', error);

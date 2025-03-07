@@ -63,7 +63,7 @@ export default {
     const fetchGames = async () => {
       isLoading.value = true;
       try {
-        games.value = await gameService.getAllGames();
+        games.value = await gameService.getMyGames();
       } catch (error) {
         console.error('Error fetching games:', error);
       } finally {

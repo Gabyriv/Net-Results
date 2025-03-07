@@ -315,6 +315,7 @@ import DashboardLayout from '../layouts/DashboardLayout.vue'
 import { useGames } from '../composable/useGames'
 import { useTeams } from '../composable/useTeams'
 import { useRouter } from 'vue-router'
+import { gameService } from '../services/gameService'
 
 export default {
   name: 'Matches',
@@ -322,11 +323,12 @@ export default {
     DashboardLayout
   },
   setup() {
-    const { games, loading, error, fetchGames, createGame, deleteGame } = useGames()
+    const { games, loading, error, fetchMyGames, createGame, deleteGame } = useGames()
     const { teams, fetchTeams } = useTeams()
     const searchQuery = ref('')
     const showCreateForm = ref(false)
     const router = useRouter()
+    const isLoading = ref(false)
     
     // Team selection state
     const showMyTeamSuggestions = ref(false)
@@ -385,15 +387,20 @@ export default {
       }, 200)
     }
     
-    // Add event listener to close suggestions when clicking outside
-    onMounted(() => {
-      fetchGames()
+    // Initialize: fetch teams and games
+    onMounted(async () => {
+      fetchGamesData()
       document.addEventListener('click', (e) => {
         const target = e.target
         if (!target.closest('.team-suggestions-container')) {
           closeMyTeamSuggestions()
         }
       })
+      
+      // Fetch teams
+      if (teams.value.length === 0) {
+        await fetchTeams({ myTeams: true })
+      }
     })
     
     // Open game overview modal
@@ -532,31 +539,46 @@ export default {
       }
     }
     
+    // Fetch games from API
+    const fetchGamesData = async () => {
+      isLoading.value = true
+      try {
+        // Fetch only the user's games using the gameService
+        const myGames = await gameService.getMyGames()
+        games.value = myGames
+      } catch (error) {
+        console.error('Error fetching games:', error)
+      } finally {
+        isLoading.value = false
+      }
+    }
+    
     // Handle game deletion
     const handleDeleteGame = async () => {
       if (!selectedGame.value || !selectedGame.value.id) {
-        return;
+        return
       }
       
-      isDeleting.value = true;
+      isDeleting.value = true
       
       try {
-        await deleteGame(selectedGame.value.id);
+        await deleteGame(selectedGame.value.id)
         
         // Close both modals
-        showDeleteConfirmation.value = false;
-        showGameOverview.value = false;
+        showDeleteConfirmation.value = false
+        showGameOverview.value = false
         
         // Refresh the games list
-        await fetchGames();
+        await fetchGamesData()
       } catch (err) {
-        console.error('Error deleting game:', err);
-        error.value = `Failed to delete game: ${err.message || 'Unknown error'}`;
+        console.error('Error deleting game:', err)
+        error.value = `Failed to delete game: ${err.message || 'Unknown error'}`
       } finally {
-        isDeleting.value = false;
+        isDeleting.value = false
       }
-    };
+    }
 
+    // Return all the reactive properties and methods
     return { 
       games, 
       loading, 
@@ -583,7 +605,9 @@ export default {
       // Delete game
       showDeleteConfirmation,
       isDeleting,
-      handleDeleteGame
+      handleDeleteGame,
+      // Fetch games data
+      fetchGamesData
     }
   }
 }

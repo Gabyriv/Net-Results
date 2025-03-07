@@ -14,6 +14,17 @@ export const gameService = {
     }
   },
 
+  // Get only games created by the current user
+  getMyGames: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/games/my-games`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching user games:', error);
+      throw error;
+    }
+  },
+
   // Get games by team ID
   getGamesByTeam: async (teamName) => {
     try {

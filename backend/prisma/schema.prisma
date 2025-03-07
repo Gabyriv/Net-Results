@@ -17,6 +17,7 @@ model User {
   managerId   String?  @unique
   manager     Manager?
   player      Player?
+  games       Game[]
 }
 
 model Manager {
@@ -61,6 +62,10 @@ model Game {
   isActive    Boolean      @default(false)
   currentSet  Int          @default(0) @db.SmallInt
   servingTeam ServingTeam? @default(Home)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model PlayerStat {

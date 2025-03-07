@@ -120,11 +120,8 @@ export default {
     const fetchData = async () => {
       isLoading.value = true
       try {
-        // Use the store's fetchDashboardData action to get all required data
-        await store.fetchDashboardData()
-        
-        // Copy data to our local refs
-        games.value = store.matches || []
+        // Directly fetch the user's games instead of using the store
+        games.value = await gameService.getMyGames()
       } catch (error) {
         console.error('Error loading dashboard data:', error)
       } finally {

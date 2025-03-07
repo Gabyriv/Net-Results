@@ -19,7 +19,8 @@ export const useMainStore = defineStore('main', {
       this.loading = true
       this.error = null
       try {
-        const data = await gameService.getAllGames()
+        // Use getMyGames to only get the current user's games
+        const data = await gameService.getMyGames()
         this.matches = data || []
         
         // Calculate wins separately

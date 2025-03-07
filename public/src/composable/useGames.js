@@ -14,14 +14,20 @@ export function useGames() {
 
   /**
    * Fetch all games from the API
+   * @param {Object} options - Options for fetching games
+   * @param {boolean} options.myGames - When true, fetch only games created by the current user
    */
-  const fetchGames = async () => {
+  const fetchGames = async (options = {}) => {
     loading.value = true
     error.value = null
     
     try {
-      // Use the unauthenticated endpoint for listing games
-      const response = await axios.get(`${API_URL}/games/list`)
+      // If myGames is true, use the authenticated endpoint that filters for user's games
+      const endpoint = options.myGames 
+        ? `${API_URL}/games/my-games` 
+        : `${API_URL}/games/list`
+      
+      const response = await axios.get(endpoint)
       
       if (response.data && response.data.success) {
         games.value = response.data.data
@@ -34,6 +40,13 @@ export function useGames() {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * Fetch only games created by the current user
+   */
+  const fetchMyGames = async () => {
+    return fetchGames({ myGames: true })
   }
 
   /**
@@ -199,6 +212,7 @@ export function useGames() {
     loading, 
     error,
     fetchGames,
+    fetchMyGames,
     fetchGameById,
     createGame,
     updateGameScore,
