@@ -27,7 +27,7 @@
             type="email"
             id="email"
             class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-blue-500"
-            placeholder="Enter your email"
+            placeholder="Enter your email (e.g. example.user@gmail.com)"
             required
           />
         </div>
@@ -89,9 +89,6 @@
       
       <div v-if="errorMessage && errorMessage.length > 0" class="mt-6 text-red-500 text-center">
         {{ errorMessage }}
-      </div>
-      <div v-if="loading" class="mt-6 text-blue-500 text-center">
-        Processing your request...
       </div>
       <div class="mt-6 text-center">
         <router-link to="/login" class="text-blue-600 hover:underline">Already have an account? Login</router-link>
