@@ -15,6 +15,12 @@ export async function GET(request: Request) {
             const { searchParams } = new URL(request.url);
             const managerId = searchParams.get('managerId');
             const myTeams = searchParams.get('myTeams') === 'true';
+            
+            logger.info('Teams fetch request', { 
+                userId: session.userId, 
+                managerId: managerId, 
+                myTeams: myTeams 
+            });
 
             // Get user from database to check role
             const dbUser = await prismaClient.user.findUnique({
@@ -23,11 +29,18 @@ export async function GET(request: Request) {
             });
             
             if (!dbUser) {
+                logger.warn('User not found', { userId: session.userId });
                 return NextResponse.json(
                     { error: 'User not found' },
                     { status: 404 }
                 );
             }
+
+            logger.info('User found', { 
+                userId: dbUser.id, 
+                role: dbUser.role, 
+                managerRecord: dbUser.manager ? true : false 
+            });
 
             // Build query based on filters
             let where = {};
@@ -35,13 +48,30 @@ export async function GET(request: Request) {
             // If managerId is provided, filter by that
             if (managerId) {
                 where = { managerId };
+                logger.info('Filtering by provided managerId', { managerId });
             }
             // If myTeams is true and user is a manager, show only their teams
             else if (myTeams && dbUser.role === 'Manager') {
                 if (!dbUser.manager) {
                     logger.warn('User has Manager role but no manager record', { userId: dbUser.id });
-                    where = { managerId: 'none' }; // This will return no teams, as no team should have this ID
+                    
+                    // Create manager record if it doesn't exist
+                    const manager = await prismaClient.manager.create({
+                        data: {
+                            id: `mgr_${Date.now()}`,
+                            displayName: dbUser.displayName,
+                            userId: dbUser.id
+                        }
+                    });
+                    
+                    logger.info('Created missing manager record', { 
+                        userId: dbUser.id, 
+                        managerId: manager.id 
+                    });
+                    
+                    where = { managerId: manager.id };
                 } else {
+                    logger.info('Filtering by user managerId', { managerId: dbUser.manager.id });
                     where = { managerId: dbUser.manager.id };
                 }
             }
@@ -60,8 +90,10 @@ export async function GET(request: Request) {
                 }
             });
 
+            logger.info('Teams fetched successfully', { count: teams.length });
             return NextResponse.json({ success: true, data: teams }, { status: 200 });
         } catch (error) {
+            logger.error('Error fetching teams', error instanceof Error ? error : new Error(String(error)));
             return handleServerError(error);
         }
     });
@@ -71,6 +103,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     return withAuth(request, async (session) => {
         try {
+            logger.info('Team creation request', { userId: session.userId });
+            
             // Get user from database to check role
             const dbUser = await prismaClient.user.findUnique({
                 where: { id: session.userId },
@@ -78,6 +112,7 @@ export async function POST(request: Request) {
             });
             
             if (!dbUser) {
+                logger.warn('User not found during team creation', { userId: session.userId });
                 return NextResponse.json(
                     { error: 'User not found' },
                     { status: 404 }
@@ -85,11 +120,28 @@ export async function POST(request: Request) {
             }
 
             // Check if user is a manager
-            if (dbUser.role !== 'Manager' || !dbUser.manager) {
+            if (dbUser.role !== 'Manager') {
+                logger.warn('Non-manager attempted to create team', { 
+                    userId: dbUser.id, 
+                    role: dbUser.role 
+                });
                 return NextResponse.json(
                     { error: 'Only managers can create teams' },
                     { status: 403 }
                 );
+            }
+
+            // Check if manager record exists, create one if it doesn't
+            let managerRecord = dbUser.manager;
+            if (!managerRecord) {
+                logger.info('Creating missing manager record for user', { userId: dbUser.id });
+                managerRecord = await prismaClient.manager.create({
+                    data: {
+                        id: `mgr_${Date.now()}`,
+                        displayName: dbUser.displayName,
+                        userId: dbUser.id
+                    }
+                });
             }
 
             const body = await request.json();
@@ -110,7 +162,7 @@ export async function POST(request: Request) {
                 data: {
                     id: teamId,
                     name: name.trim(),
-                    managerId: dbUser.manager.id,
+                    managerId: managerRecord.id,
                     // Connect existing players if playerIds are provided
                     players: playerIds.length > 0 ? {
                         connect: playerIds.map((id: string) => ({ id }))
@@ -127,7 +179,7 @@ export async function POST(request: Request) {
             });
 
             // Log the successful team creation
-            logger.info('Team created', { teamId, managerId: dbUser.manager.id });
+            logger.info('Team created', { teamId, managerId: managerRecord.id });
             
             // If there are new players to create, redirect to the player creation endpoint
             if (newPlayers && Array.isArray(newPlayers) && newPlayers.length > 0) {
@@ -162,6 +214,7 @@ export async function POST(request: Request) {
 
             return NextResponse.json({ success: true, data: team }, { status: 201 });
         } catch (error) {
+            logger.error('Error creating team', error instanceof Error ? error : new Error(String(error)));
             return handleServerError(error);
         }
     });

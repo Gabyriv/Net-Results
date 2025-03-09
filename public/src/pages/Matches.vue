@@ -156,7 +156,7 @@
           
           <div class="flex justify-between mt-4">
             <div class="text-sm text-gray-500">
-              <p>Sets: {{ game.sets }}</p>
+              <p>Sets: {{ game.sets }} (Best of {{ game.maxSets || game.sets }})</p>
             </div>
             <div class="text-sm text-gray-500">
               <p>{{ formatDate(game.created_at) }}</p>
@@ -242,7 +242,7 @@
             <div class="grid grid-cols-2 gap-4 border-t pt-4">
               <div>
                 <p class="text-gray-600">Number of Sets:</p>
-                <p class="font-semibold">{{ selectedGame.sets }}</p>
+                <p class="font-semibold">{{ selectedGame.sets }} (Best of {{ selectedGame.maxSets || selectedGame.sets }})</p>
               </div>
               <div>
                 <p class="text-gray-600">Result:</p>
@@ -359,14 +359,27 @@ export default {
         }
         
         // Return as array if it's an array, otherwise convert from object to array
+        let scoresArray = [];
         if (Array.isArray(setScores)) {
-          return setScores;
+          scoresArray = setScores;
         } else if (setScores && typeof setScores === 'object') {
           // Handle if it's stored as an object with keys like "0", "1", "2"
-          return Object.values(setScores);
-        } else {
-          return [];
+          scoresArray = Object.values(setScores);
         }
+        
+        // Filter out sets that weren't actually played and limit to maxSets
+        scoresArray = scoresArray.filter(set => 
+          (set.homeScore > 0 || set.awayScore > 0) && !set.notPlayed
+        );
+        
+        // Ensure we never show more sets than the match format allows
+        const maxAllowedSets = selectedGame.value.maxSets || selectedGame.value.sets;
+        if (scoresArray.length > maxAllowedSets) {
+          console.warn(`Found ${scoresArray.length} sets but match format is best of ${maxAllowedSets}. Limiting display.`);
+          scoresArray = scoresArray.slice(0, maxAllowedSets);
+        }
+        
+        return scoresArray;
       } catch (error) {
         console.error('Error parsing set scores:', error);
         return [];
@@ -515,6 +528,8 @@ export default {
           ...newGame.value,
           myPts: 0,
           oppPts: 0,
+          // Set maxSets to the same value as sets
+          maxSets: newGame.value.sets,
           // ServingTeam will use the database default
           // Initialize empty JSON strings for new fields
           setScores: '{}',

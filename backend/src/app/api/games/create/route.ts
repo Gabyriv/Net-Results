@@ -45,6 +45,7 @@ export async function POST(request: Request) {
                 oppTeam: validationResult.data.oppTeam,
                 oppPts: validationResult.data.oppPts || 0,
                 sets: validationResult.data.sets,
+                maxSets: validationResult.data.maxSets || validationResult.data.sets,
                 created_at: validationResult.data.created_at || new Date(),
                 setScores: validationResult.data.setScores 
                     ? (typeof validationResult.data.setScores === 'string' 

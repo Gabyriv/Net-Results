@@ -57,6 +57,7 @@ model Game {
   oppTeam     String
   oppPts      Int
   sets        Int
+  maxSets     Int          @default(3)
   setScores   Json?
   setsWon     Json?
   isActive    Boolean      @default(false)
