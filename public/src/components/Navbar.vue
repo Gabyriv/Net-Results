@@ -34,9 +34,6 @@
       <li>
         <router-link to="/register" class="text-xl text-white hover:text-gray-200 transition duration-300">Register</router-link>
       </li>
-      <li>
-        <router-link to="/api-connection" class="text-xl text-white hover:text-gray-200 transition duration-300">API Test</router-link>
-      </li>
     </ul>
   </nav>
 </template>
@@ -81,4 +78,4 @@ export default {
 .text-3xl {
   font-size: 1.875rem; /* This is equivalent to 30px */
 }
-</style>
+</style>`

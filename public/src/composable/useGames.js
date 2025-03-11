@@ -93,10 +93,15 @@ export function useGames() {
       // Use the unauthenticated endpoint for creating games
       const response = await axios.post(`${API_URL}/games/create`, gameData)
       
+      console.log('Create game response:', response.data);
+      
       if (response.data && response.data.success) {
         // Add the new game to the games array
-        games.value = [response.data.data, ...games.value]
-        return response.data.data
+        const createdGame = response.data.data;
+        console.log('Successfully created game:', createdGame);
+        
+        games.value = [createdGame, ...games.value]
+        return createdGame
       } else {
         console.error('Error response from server:', response.data);
         throw new Error(response.data?.error || 'Failed to create game')

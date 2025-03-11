@@ -14,7 +14,104 @@
         {{ setsWon.home > setsWon.away ? game.myTeam : game.oppTeam }} won {{ setsWon.home > setsWon.away ? setsWon.home : setsWon.away }} 
         out of {{ Math.ceil(game.maxSets / 2) }} required sets in a Best of {{ game.maxSets }} format
       </p>
+      
+      <!-- Show stats summary button -->
+      <button 
+        v-if="playerStats.length > 0"
+        @click="showStatsSummary = !showStatsSummary" 
+        class="mt-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      >
+        {{ showStatsSummary ? 'Hide Stats Summary' : 'View Match Statistics' }}
+      </button>
     </div>
+    
+    <!-- Match Statistics Summary -->
+    <div v-if="matchComplete && showStatsSummary && playerStats.length > 0" class="mb-6">
+      <PlayerStatsSummary 
+        :stats="playerStats" 
+        :teams="{ home: game.myTeam, away: game.oppTeam }" 
+      />
+    </div>
+
+    <!-- Player Statistics Modal -->
+    <div v-if="showStatModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <h3 class="text-lg font-bold mb-4">
+          {{ selectedPlayer.team === 'home' ? game.myTeam : game.oppTeam }} 
+          <span v-if="selectedPlayer.number === 'E'">Error</span>
+          <span v-else>
+            - {{ selectedPlayer.name || `Player ${selectedPlayer.number}` }}
+            <span class="text-sm text-gray-500">(#{{ selectedPlayer.number }})</span>
+          </span>
+        </h3>
+        
+        <!-- Stat Type Selection -->
+        <div class="mb-4">
+          <p class="text-sm text-gray-600 mb-2">Select Stat Type:</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button 
+              v-for="statType in statTypes" 
+              :key="statType" 
+              @click="selectedStatType = statType"
+              class="py-2 px-4 rounded text-sm"
+              :class="selectedStatType === statType ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'"
+            >
+              {{ statType }}
+            </button>
+          </div>
+        </div>
+        
+        <!-- Stat Quality Selection -->
+        <div v-if="selectedStatType" class="mb-6">
+          <p class="text-sm text-gray-600 mb-2">Select Result:</p>
+          <div class="flex space-x-4 justify-center">
+            <button 
+              @click="recordStat('+')"
+              class="py-3 px-6 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 font-bold text-xl"
+            >
+              + <span class="text-xs block mt-1">Point</span>
+            </button>
+            <button 
+              @click="recordStat('=')"
+              class="py-3 px-6 rounded-lg bg-yellow-100 hover:bg-yellow-200 text-yellow-700 font-bold text-xl"
+            >
+              = <span class="text-xs block mt-1">Good</span>
+            </button>
+            <button 
+              @click="recordStat('-')"
+              class="py-3 px-6 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xl"
+            >
+              - <span class="text-xs block mt-1">Error</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="flex justify-end space-x-2">
+          <button 
+            @click="closeStatModal"
+            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Popup -->
+    <ActionPopup
+      v-if="showActionPopup && dynamicSelectedPlayer"
+      :player="dynamicSelectedPlayer"
+      :onActionSelect="handleActionSelect"
+      :onClose="closePopups"
+    />
+
+    <!-- Result Popup -->
+    <ResultPopup
+      v-if="showResultPopup && selectedAction"
+      :action="selectedAction"
+      :onResultSelect="handleResultSelect"
+      :onClose="closePopups"
+    />
 
     <!-- Scoreboard -->
     <div class="grid grid-cols-2 gap-8 mb-6">
@@ -69,14 +166,15 @@
             </button>
           </div>
         </div>
-        <button 
-          @click="toggleServing('home')" 
-          :disabled="matchComplete"
-          class="mt-4 px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded"
-          :class="{ 'opacity-50 cursor-not-allowed': matchComplete }"
-        >
-          Service
-        </button>
+        
+        <!-- Player Selection Section -->
+        <div class="mt-4 border-t pt-4">
+          <CourtDisplay 
+            :players="teamPlayers"
+            @player-selected="handlePlayerSelected"
+            @toggle-service="toggleServing('home')"
+          />
+        </div>
       </div>
 
       <!-- Away Team -->
@@ -130,14 +228,16 @@
             </button>
           </div>
         </div>
-        <button 
-          @click="toggleServing('away')" 
-          :disabled="matchComplete"
-          class="mt-4 px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded"
-          :class="{ 'opacity-50 cursor-not-allowed': matchComplete }"
-        >
-          Service
-        </button>
+        
+        <!-- Away team players -->
+        <div class="mt-4 border-t pt-4">
+          <CourtDisplay 
+            :players="[]"  
+            @player-selected="handleAwayPlayerSelected"
+            @toggle-service="toggleServing('away')"
+          />
+          <!-- Away team has no players to display -->
+        </div>
       </div>
     </div>
 
@@ -229,6 +329,14 @@
       </div>
     </div>
 
+    <!-- Player Statistics Tracker -->
+    <div class="mb-6" v-if="playerStats.length > 0">
+      <PlayerStatsTracker 
+        :stats="playerStats" 
+        :teams="{ home: game.myTeam, away: game.oppTeam }" 
+      />
+    </div>
+
     <!-- Save and Exit -->
     <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
       <button 
@@ -253,9 +361,28 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { realtimeService } from '../services/realtimeService'
 import { useGames } from '../composable/useGames'
+import PlayerStatsTracker from './stats/PlayerStatsTracker.vue'
+import PlayerStatsSummary from './stats/PlayerStatsSummary.vue'
+import PlayerSquares from './PlayerSquares.vue'
+import ActionPopup from './stats/ActionPopup.vue'
+import ResultPopup from './stats/ResultPopup.vue'
+import { useRouter } from 'vue-router'
+import { useTeams } from '../composable/useTeams'
+import { teamService } from '../services/teamServiceWrapper'
+import VolleyballCourt from './VolleyballCourt.vue'
+import CourtDisplay from './CourtDisplay.vue'
 
 export default {
   name: 'VolleyballScoreboard',
+  components: {
+    PlayerStatsTracker,
+    PlayerStatsSummary,
+    PlayerSquares,
+    ActionPopup,
+    ResultPopup,
+    VolleyballCourt,
+    CourtDisplay
+  },
   props: {
     gameId: {
       type: [Number, String],
@@ -264,7 +391,10 @@ export default {
   },
   emits: ['exit', 'updated'],
   setup(props, { emit }) {
+    const router = useRouter()
+    const { getPlayer } = useTeams()
     const { updateGameScore } = useGames()
+    
     const game = ref({
       id: null,
       game: '',
@@ -272,13 +402,25 @@ export default {
       oppTeam: '',
       myPts: 0,
       oppPts: 0,
-      sets: 3,
+      maxSets: 3,
       created_at: new Date()
     })
-    
+
+    const playerPositions = ref({
+      1: null, // Position 1 (Server)
+      2: null, // Position 2 (Front Right)
+      3: null, // Position 3 (Front Center)
+      4: null, // Position 4 (Front Left)
+      5: null, // Position 5 (Back Left)
+      6: null  // Position 6 (Back Center)
+    })
+
     const isSaving = ref(false)
     const isServing = ref('home') // 'home' or 'away'
-    
+
+    // Show/hide statistics summary
+    const showStatsSummary = ref(false)
+
     // Set tracking
     const currentSetIndex = ref(0)
     const setHistory = ref([])
@@ -286,13 +428,216 @@ export default {
       homeScore: 0,
       awayScore: 0
     })
-    
+
     // Timeouts tracking (2 per team per set)
     const timeouts = reactive({
       home: [false, false],
       away: [false, false]
     })
-    
+
+    // Player statistics tracking
+    const showStatModal = ref(false)
+    const selectedPlayer = ref({ team: '', number: null })
+    const selectedStatType = ref('')
+    const statTypes = ['Serve', 'Pass', 'Set', 'Attack', 'Block', 'Dig']
+
+    // Player stats history
+    const playerStats = ref([])
+
+    // Roster of team players 
+    const teamPlayers = ref([])
+
+    // Sort players by jersey number
+    const sortedPlayers = computed(() => {
+      return [...teamPlayers.value].sort((a, b) => {
+        const numA = parseInt(a.jerseyNumber) || 0;
+        const numB = parseInt(b.jerseyNumber) || 0;
+        return numA - numB;
+      });
+    });
+
+    // Court positions (1-6) mapped to player IDs
+    const courtPositions = ref({
+      1: null, // Position 1 (Server)
+      2: null, // Position 2 (Front Right)
+      3: null, // Position 3 (Front Center)
+      4: null, // Position 4 (Front Left)
+      5: null, // Position 5 (Back Left)
+      6: null  // Position 6 (Back Center)
+    })
+
+    // Function to get player by position
+    const getPlayerInPosition = (position) => {
+      const playerId = courtPositions.value[position];
+      return teamPlayers.value.find(p => p.id === playerId) || null;
+    }
+
+    // Function to assign player to position
+    const assignPlayerToPosition = (position, playerId) => {
+      // Remove player from their current position if they're already on court
+      Object.keys(courtPositions.value).forEach(pos => {
+        if (courtPositions.value[pos] === playerId) {
+          courtPositions.value[pos] = null;
+        }
+      });
+      
+      // Assign to new position
+      courtPositions.value[position] = playerId;
+    }
+
+    // Function to rotate positions clockwise
+    const rotatePositions = (team) => {
+      if (team === 'home') {
+        const temp = courtPositions.value[1];
+        courtPositions.value[1] = courtPositions.value[6];
+        courtPositions.value[6] = courtPositions.value[5];
+        courtPositions.value[5] = courtPositions.value[4];
+        courtPositions.value[4] = courtPositions.value[3];
+        courtPositions.value[3] = courtPositions.value[2];
+        courtPositions.value[2] = temp;
+      }
+    }
+
+    // Function to load team roster
+    const loadTeamRoster = async () => {
+      try {
+        console.log('Loading team roster for team:', game.value.myTeam);
+        
+        // First, try to use the teamService.getTeamRoster function to fetch the roster
+        if (game.value && game.value.myTeam) {
+          try {
+            const players = await teamService.getTeamRoster(game.value.myTeam);
+            
+            if (players && players.length > 0) {
+              console.log('Team roster loaded successfully with teamService:', players);
+              teamPlayers.value = players;
+              return; // Exit early since we found players
+            }
+          } catch (e) {
+            console.error('Error using teamService.getTeamRoster:', e);
+            // Fall back to other methods if getTeamRoster fails
+          }
+        }
+        
+        // If getTeamRoster failed or returned no players, try localStorage
+        const teamsData = localStorage.getItem('teams');
+        if (teamsData) {
+          try {
+            const teams = JSON.parse(teamsData);
+            console.log('Teams found in localStorage:', teams);
+            
+            // Find the team that matches our current game's team name
+            const myTeam = teams.find(t => t.name === game.value.myTeam);
+            console.log('Team matching game.myTeam:', myTeam);
+            
+            if (myTeam && Array.isArray(myTeam.players) && myTeam.players.length > 0) {
+              // Map the team's players to our expected format
+              teamPlayers.value = myTeam.players.map(player => ({
+                id: player.id || player._id || String(Math.random()),
+                name: player.name || player.displayName || `Player ${player.number || player.jerseyNumber}`,
+                jerseyNumber: player.jerseyNumber || player.number || '0'
+              }));
+              console.log('Team loaded from localStorage. Team name:', game.value.myTeam, 'Players found:', teamPlayers.value.length);
+              return; // Exit early since we found players
+            }
+          } catch (e) {
+            console.error('Error parsing local teams data:', e);
+          }
+        }
+        
+        // As a last resort, check if we can find the team in 'myTeams' localStorage
+        const myTeamsData = localStorage.getItem('myTeams');
+        if (myTeamsData) {
+          try {
+            const myTeams = JSON.parse(myTeamsData);
+            console.log('Teams found in myTeams localStorage:', myTeams);
+            
+            // Find the team that matches our current game's team name
+            const myTeam = myTeams.find(t => t.name === game.value.myTeam);
+            console.log('Team matching game.myTeam in myTeams:', myTeam);
+            
+            if (myTeam && Array.isArray(myTeam.players) && myTeam.players.length > 0) {
+              // Map the team's players to our expected format
+              teamPlayers.value = myTeam.players.map(player => ({
+                id: player.id || player._id || String(Math.random()),
+                name: player.name || player.displayName || `Player ${player.number || player.jerseyNumber}`,
+                jerseyNumber: player.jerseyNumber || player.number || '0'
+              }));
+              console.log('Team loaded from myTeams localStorage. Players found:', teamPlayers.value.length);
+              return; // Exit early since we found players
+            }
+          } catch (e) {
+            console.error('Error parsing myTeams data:', e);
+          }
+        }
+        
+        // If we get here, we did not find any players
+        console.warn('No players found for team: ' + game.value.myTeam);
+        
+        // Don't add hardcoded players when no players are found
+        teamPlayers.value = [];
+        console.log('No players found for team, setting empty array');
+      } catch (error) {
+        console.error('Error loading team roster:', error);
+        
+        // Set empty array instead of hardcoded players
+        teamPlayers.value = [];
+        console.log('Error loading team roster, setting empty array');
+      }
+    };
+
+    // Functions for player statistics
+    const openPlayerStatModal = (team, position, playerId = null, playerName = null) => {
+      const player = playerId ? teamPlayers.value.find(p => p.id === playerId) : getPlayerInPosition(position);
+      
+      selectedPlayer.value = { 
+        team, 
+        number: player ? player.jerseyNumber : position,
+        id: player ? player.id : null,
+        name: player ? player.name : `Player ${position}`
+      };
+      selectedStatType.value = '';
+      showStatModal.value = true;
+    };
+
+    const closeStatModal = () => {
+      showStatModal.value = false
+    }
+
+    const recordStat = (quality) => {
+      // Create a new stat entry with player details
+      const newStat = {
+        team: selectedPlayer.value.team,
+        playerNumber: selectedPlayer.value.number,
+        playerId: selectedPlayer.value.id,
+        playerName: selectedPlayer.value.name,
+        statType: selectedStatType.value,
+        quality: quality,
+        timestamp: new Date()
+      };
+      
+      // Add to stats history
+      playerStats.value.push(newStat);
+      console.log('Recorded stat:', newStat, 'Total stats:', playerStats.value.length);
+      
+      // Handle scoring based on the stat
+      if (selectedPlayer.value.number === 'E') {
+        // If it's an error by the opponent, award a point to the team
+        const scoringTeam = selectedPlayer.value.team === 'home' ? 'away' : 'home';
+        updateScore(scoringTeam, 1);
+      } else if (quality === '+') {
+        // Good play with point - award a point to the player's team
+        updateScore(selectedPlayer.value.team, 1);
+      } else if (quality === '-') {
+        // Error - award a point to the opposing team
+        const opposingTeam = selectedPlayer.value.team === 'home' ? 'away' : 'home';
+        updateScore(opposingTeam, 1);
+      }
+      
+      // Close the modal
+      closeStatModal();
+    }
+
     // Computed properties
     const setsWon = computed(() => {
       const result = { home: 0, away: 0 }
@@ -307,7 +652,7 @@ export default {
       
       return result
     })
-    
+
     // Determine if the match is complete based on maxSets
     const matchComplete = computed(() => {
       // Calculate sets needed to win (best of 3 = 2 sets, best of 5 = 3 sets)
@@ -316,7 +661,7 @@ export default {
       // Match is complete if either team has won enough sets
       return setsWon.value.home >= setsToWin || setsWon.value.away >= setsToWin;
     })
-    
+
     // Helper function to determine if a set was played after the match was technically complete
     const isSetAfterMatchComplete = (setIndex) => {
       // If this set is beyond the maximum allowed sets, it's definitely an extra set
@@ -346,7 +691,7 @@ export default {
       
       return false;
     }
-    
+
     // Helper function to determine if a set was the decisive one (match point)
     const isSetDecisive = (setIndex) => {
       const setsToWin = Math.ceil(game.value.maxSets / 2);
@@ -372,27 +717,27 @@ export default {
       // If after this set, the match was complete, and wasn't already complete, this was the decisive set
       return (homeWins === setsToWin || awayWins === setsToWin) && !isSetAfterMatchComplete(setIndex);
     }
-    
+
     // Determine the target score for the current set
     const currentSetTargetScore = computed(() => {
       // Deciding set (last set of the match) goes to 15, otherwise 25
       const isDecidingSet = currentSetIndex.value + 1 === game.value.maxSets;
       return isDecidingSet ? 15 : 25;
     });
-    
+
     // Helper function to determine the target score for any set
     const getTargetScoreForSet = (setIndex) => {
       // Deciding set (last set of the match) goes to 15, otherwise 25
       const isDecidingSet = setIndex + 1 === game.value.maxSets;
       return isDecidingSet ? 15 : 25;
     };
-    
+
     // Format date for display
     const formatDate = (dateString) => {
       const date = new Date(dateString)
       return date.toLocaleDateString()
     }
-    
+
     // Update score
     const updateScore = (team, points) => {
       // Prevent scoring if match is complete
@@ -414,7 +759,7 @@ export default {
         isServing.value = team
       }
     }
-    
+
     // Toggle which team is serving
     const toggleServing = (team) => {
       // Prevent changing serve if match is complete
@@ -425,7 +770,7 @@ export default {
       
       isServing.value = team
     }
-    
+
     // Toggle a timeout for a team
     const toggleTimeout = (team, index) => {
       // Prevent timeout changes if match is complete
@@ -436,7 +781,7 @@ export default {
       
       timeouts[team][index] = !timeouts[team][index]
     }
-    
+
     // Check if a set can be finished (a team must win by at least 2 points)
     const canFinishSet = computed(() => {
       const homeScore = currentSet.homeScore;
@@ -463,7 +808,7 @@ export default {
       
       return false;
     });
-    
+
     // Finish the current set and start a new one
     const finishSet = () => {
       // Check if the set can be finished (need to win by 2)
@@ -511,7 +856,7 @@ export default {
       // Alternate serve for new set
       isServing.value = isServing.value === 'home' ? 'away' : 'home'
     }
-    
+
     // Reset the current set
     const resetSet = () => {
       // Don't allow reset if match is complete
@@ -527,50 +872,45 @@ export default {
         timeouts.away = [false, false]
       }
     }
-    
+
     // Load game data
     const loadGame = async () => {
-      if (!props.gameId) {
-        console.error('Cannot load game: No gameId provided', props.gameId)
-        return
-      }
-      
-      console.log('Loading game data for ID:', props.gameId)
-      
       try {
-        // Fetch the game
         const gameData = await realtimeService.getGameState(props.gameId)
         
         if (gameData) {
-          game.value = gameData
-          console.log('Loaded game data:', gameData)
+          game.value = {
+            id: gameData.id,
+            game: gameData.game || '',
+            myTeam: gameData.myTeam || '',
+            oppTeam: gameData.oppTeam || '',
+            myPts: gameData.myPts || 0,
+            oppPts: gameData.oppPts || 0,
+            maxSets: gameData.sets || 3,
+            created_at: gameData.created_at || new Date()
+          }
           
-          // If we have set scores saved, restore them
+          console.log('Game loaded:', game.value.myTeam, 'VS', game.value.oppTeam)
+          
+          // Process set scores if available
           if (gameData.setScores) {
             try {
-              // Handle different formats of setScores (string, object, or array)
               let scores;
               
               if (typeof gameData.setScores === 'string') {
-                // If it's a string, try to parse it
                 scores = JSON.parse(gameData.setScores);
                 console.log('Parsed setScores from string:', scores);
-              } else if (typeof gameData.setScores === 'object') {
-                // If it's already an object (from Prisma's JSON fields)
+              } else if (Array.isArray(gameData.setScores)) {
                 scores = gameData.setScores;
-                console.log('Using setScores as object:', scores);
+                console.log('Using setScores as array:', scores);
               } else {
-                console.warn('Unexpected setScores data type:', typeof gameData.setScores);
                 scores = [];
+                console.warn('setScores is not a string or array, using empty array');
               }
               
-              // Ensure it's an array
-              if (!Array.isArray(scores)) {
-                console.warn('setScores is not an array, using empty array instead:', scores);
-                scores = [];
-              }
+              // Filter out current (in progress) set if present
+              scores = scores.filter(set => !set.inProgress && !set.notPlayed);
               
-              // Handle the set history
               if (scores.length > 0) {
                 // Last set is the current set
                 const lastSet = scores.pop();
@@ -597,6 +937,40 @@ export default {
             }
           }
           
+          // Load player stats and positions if available
+          if (gameData.notes) {
+            try {
+              let data;
+              if (typeof gameData.notes === 'string') {
+                data = JSON.parse(gameData.notes);
+              } else {
+                data = gameData.notes;
+              }
+
+              if (data.stats) {
+                playerStats.value = Array.isArray(data.stats) ? data.stats : [];
+              }
+              
+              // Load saved player positions
+              if (data.positions) {
+                // Ensure positions is an object with valid position numbers
+                const savedPositions = typeof data.positions === 'object' ? data.positions : {};
+                // Update each position while maintaining the ref structure
+                Object.keys(playerPositions.value).forEach(pos => {
+                  playerPositions.value[pos] = savedPositions[pos] || null;
+                });
+                console.log('Loaded player positions:', playerPositions.value);
+              }
+            } catch (e) {
+              console.error('Error processing player stats and positions:', e);
+              playerStats.value = [];
+              // Reset positions to default state
+              Object.keys(playerPositions.value).forEach(pos => {
+                playerPositions.value[pos] = null;
+              });
+            }
+          }
+          
           // Process setsWon data if available
           if (gameData.setsWon) {
             try {
@@ -604,101 +978,161 @@ export default {
               
               if (typeof gameData.setsWon === 'string') {
                 setsWonData = JSON.parse(gameData.setsWon);
-                console.log('Parsed setsWon from string:', setsWonData);
-              } else if (typeof gameData.setsWon === 'object') {
+              } else {
                 setsWonData = gameData.setsWon;
-                console.log('Using setsWon as object:', setsWonData);
               }
               
-              // We don't need to update setsWon since it's a computed property
-              // that's calculated from setHistory
-            } catch (e) {
-              console.error('Error processing setsWon data:', e);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading game:', error);
-        alert('Error loading game data. Please try refreshing the page.');
-      }
-    }
-    
-    // Save the game state
-    const saveGame = async () => {
-      if (!props.gameId) {
-        console.error('Cannot save game: No gameId provided', props.gameId);
-        alert('Error: Game ID is missing. Please refresh the page and try again.');
-        return;
-      }
-      
-      isSaving.value = true;
-      console.log('Saving game with ID:', props.gameId);
-      
-      try {
-        // Calculate total points from set history and current set
-        let myTotalPts = currentSet.homeScore;
-        let oppTotalPts = currentSet.awayScore;
-        
-        setHistory.value.forEach(set => {
-          myTotalPts += set.homeScore;
-          oppTotalPts += set.awayScore;
-        });
-        
-        // Create an array of all sets including current
-        const allSets = [
-          ...setHistory.value, 
-          {
-            homeScore: currentSet.homeScore,
-            awayScore: currentSet.awayScore,
-            inProgress: true
-          }
-        ];
-        
-        // Ensure all numeric values are proper numbers
-        const gameId = parseInt(props.gameId);
-        const myPts = Number(myTotalPts);
-        const oppPts = Number(oppTotalPts);
-        const currentSetNum = Number(currentSetIndex.value + 1);
-        
-        // Make sure setScores is a proper array before stringifying
-        let setScoresString;
-        try {
-          // Determine how many total sets there should be based on maxSets
-          const totalSets = game.value.sets;
-          
-          // First ensure we have a valid array for the played sets
-          const validSets = allSets.map(set => ({
-            homeScore: Number(set.homeScore || 0),
-            awayScore: Number(set.awayScore || 0),
-            inProgress: !!set.inProgress
-          }));
-          
-          // If match is complete, ensure all sets from the game are represented
-          // and mark unplayed sets appropriately
-          if (matchComplete.value && validSets.length < totalSets) {
-            // How many sets were actually needed to determine the winner
-            const setsToWin = Math.ceil(game.value.maxSets / 2);
-            const setsPlayed = setHistory.value.length;
-            
-            // If a team already won, add placeholder sets for remaining unplayed sets
-            if ((setsWon.value.home >= setsToWin || setsWon.value.away >= setsToWin) && setsPlayed < totalSets) {
-              // Add empty sets marked as "not played" for the remaining sets
-              for (let i = setsPlayed; i < totalSets; i++) {
-                validSets.push({
-                  homeScore: 0,
-                  awayScore: 0,
-                  notPlayed: true,
-                  inProgress: false
+              if (setsWonData && typeof setsWonData === 'object') {
+                // Update reactive setsWon computed value source data
+                setHistory.value = setHistory.value.map((set, index) => {
+                  return {
+                    ...set,
+                    winner: set.homeScore > set.awayScore ? 'home' : 'away'
+                  };
                 });
               }
+            } catch (e) {
+              console.error('Error processing setsWon:', e);
             }
           }
+
+          // Emit the updated event with the loaded game
+          emit('updated', game.value);
+        }
+      } catch (error) {
+        console.error('Error loading game:', error)
+      }
+    }
+
+    // Set up real-time subscription
+    let subscription = null
+
+    const setupRealtimeSubscription = () => {
+      if (!props.gameId) {
+        console.error('Cannot set up subscription: Invalid gameId', props.gameId)
+        return
+      }
+      
+      console.log('Setting up real-time subscription for game ID:', props.gameId)
+      
+      subscription = realtimeService.subscribeToGame(props.gameId, (updatedGame) => {
+        // Only update if this is not our own update
+        if (!isSaving.value) {
+          console.log('Received real-time update for game:', updatedGame);
+          game.value = updatedGame
           
-          setScoresString = JSON.stringify(validSets);
+          // We don't need to manually update scores since loadGame will handle it
+          // when we call it with the updated game data
+          loadGame();
+        }
+      })
+    }
+
+    // Clean up on component unmount
+    onBeforeUnmount(() => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+      
+      if (autoSaveInterval) {
+        clearInterval(autoSaveInterval)
+      }
+    })
+
+    // Auto-save on interval
+    let autoSaveInterval = null
+    let saveErrorCount = 0 // Track consecutive save errors
+
+    onMounted(async () => {
+      console.log('VolleyballScoreboard mounted, loading game and roster...');
+      await loadGame();
+      console.log('Game loaded:', game.value);
+      
+      // Load team roster explicitly after game is loaded
+      await loadTeamRoster();
+      console.log('Team roster loaded:', teamPlayers.value.length, 'players found');
+      if (teamPlayers.value.length > 0) {
+        console.log('Loaded players:', teamPlayers.value);
+      } else {
+        console.log('No players loaded for team:', game.value.myTeam);
+      }
+      
+      // Rest of the onMounted function
+      setupRealtimeSubscription()
+      
+      // Auto-save every minute, but stop if we encounter too many errors
+      autoSaveInterval = setInterval(() => {
+        // Only attempt auto-save if we haven't had too many errors
+        if (saveErrorCount < 3) {
+          saveGame().catch(err => {
+            saveErrorCount++;
+            console.warn(`Auto-save failed (${saveErrorCount}/3), will ${saveErrorCount < 3 ? 'retry next interval' : 'stop retrying'}`);
+            
+            // If we've hit the limit, clear the interval
+            if (saveErrorCount >= 3) {
+              clearInterval(autoSaveInterval);
+              console.error('Auto-save disabled due to consecutive errors. Please save manually.');
+            }
+          });
+        }
+      }, 60000) // 1 minute
+    })
+
+    // Watch for team changes and reload roster
+    watch(() => game.value.myTeam, async (newTeam, oldTeam) => {
+      if (newTeam && newTeam !== oldTeam) {
+        console.log('Team changed from', oldTeam, 'to', newTeam, '- reloading roster');
+        await loadTeamRoster();
+      }
+    });
+
+    // Save the game state
+    const saveGame = async () => {
+      if (isSaving.value) return;
+      
+      isSaving.value = true;
+      
+      try {
+        // Prepare set scores for saving
+        let setScoresString = '[]';
+        try {
+          const setScores = {};
+          
+          // Add completed sets
+          setHistory.value.forEach((set, index) => {
+            setScores[index + 1] = {
+              homeScore: set.homeScore,
+              awayScore: set.awayScore,
+              inProgress: false
+            };
+          });
+          
+          // Add current set if in progress
+          if (!matchComplete.value) {
+            setScores[currentSetIndex.value + 1] = {
+              homeScore: currentSet.homeScore,
+              awayScore: currentSet.awayScore,
+              inProgress: true
+            };
+          }
+          
+          setScoresString = JSON.stringify(setScores);
           console.log('Formatted setScores as JSON string:', setScoresString);
         } catch (e) {
           console.error('Error stringifying setScores:', e);
           setScoresString = '[]'; // Fallback to empty array
+        }
+        
+        // Prepare player stats and positions for saving
+        let notesString = '{}'
+        try {
+          const notesData = {
+            stats: playerStats.value,
+            positions: playerPositions.value
+          };
+          notesString = JSON.stringify(notesData);
+        } catch (e) {
+          console.error('Error stringifying notes data:', e);
         }
         
         // Make sure setsWon is a proper object
@@ -717,98 +1151,213 @@ export default {
         
         // Update the game data - only include fields defined in GameUpdateSchema
         const gameData = {
-          myPts,
-          oppPts,
+          myPts: Number(game.value.myPts),
+          oppPts: Number(game.value.oppPts),
           setScores: setScoresString,
           setsWon: setsWonString,
-          currentSet: currentSetNum
+          currentSet: Number(currentSetIndex.value + 1),
+          notes: notesString
         };
         
         console.log('Updating game with data:', gameData);
-        const updatedGame = await realtimeService.updateGame(gameId, gameData);
         
-        if (updatedGame) {
-          console.log('Game updated successfully:', updatedGame);
-          emit('updated', updatedGame);
+        try {
+          // Get the auth token from localStorage
+          const userStr = localStorage.getItem('user');
+          let authToken = null;
+          
+          if (userStr) {
+            try {
+              const userData = JSON.parse(userStr);
+              if (userData && userData.token) {
+                authToken = userData.token;
+              }
+            } catch (e) {
+              console.error('Error parsing user data:', e);
+            }
+          }
+          
+          // Include the auth token in headers if available
+          const headers = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+          
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/games/${game.value.id}`, {
+            method: 'PUT',
+            headers,
+            credentials: 'include', // Include cookies for fallback auth
+            body: JSON.stringify(gameData)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+          }
+        } catch (error) {
+          console.error('Error saving game:', error);
+          throw error;
         }
       } catch (error) {
         console.error('Failed to save game:', error);
-        alert('Failed to save game. Please try again.');
+        alert('Failed to save game. Please try again or consider saving a backup of your data.');
       } finally {
         isSaving.value = false;
       }
     }
-    
-    // Set up real-time subscription
-    let subscription = null
-    
-    const setupRealtimeSubscription = () => {
-      if (!props.gameId) {
-        console.error('Cannot set up subscription: Invalid gameId', props.gameId)
-        return
+
+    // Dynamic player tracking state
+    const showActionPopup = ref(false)
+    const showResultPopup = ref(false)
+    const selectedAction = ref(null)
+    const dynamicSelectedPlayer = ref(null)
+    const activeTeamId = computed(() => {
+      // Get the team ID from the teamPlayers data
+      if (game.value && game.value.teamId) {
+        return game.value.teamId;
+      }
+      // If no teamId in game data, try to find it in localStorage
+      const teamsData = localStorage.getItem('teams');
+      if (teamsData) {
+        try {
+          const teams = JSON.parse(teamsData);
+          const team = teams.find(t => t.name === game.value.myTeam);
+          if (team) {
+            return team.id;
+          }
+        } catch (e) {
+          console.error('Error parsing teams data:', e);
+        }
       }
       
-      console.log('Setting up realtime subscription for game ID:', props.gameId)
-      
-      subscription = realtimeService.subscribeToGame(props.gameId, (updatedGame) => {
-        // Only update if this is not our own update
-        if (!isSaving.value) {
-          console.log('Received real-time update for game:', updatedGame);
-          game.value = updatedGame
-          
-          // We don't need to manually update scores since loadGame will handle it
-          // when we call it with the updated game data
-          loadGame();
+      // As a fallback, try myTeams in localStorage
+      const myTeamsData = localStorage.getItem('myTeams');
+      if (myTeamsData) {
+        try {
+          const myTeams = JSON.parse(myTeamsData);
+          const team = myTeams.find(t => t.name === game.value.myTeam);
+          if (team) {
+            return team.id;
+          }
+        } catch (e) {
+          console.error('Error parsing myTeams data:', e);
         }
-      })
+      }
+      
+      console.warn('Could not find team ID for:', game.value.myTeam);
+      return null;
+    });
+
+    // Handle player selection from PlayerSquares component
+    const handlePlayerSelected = (player) => {
+      dynamicSelectedPlayer.value = player
+      showActionPopup.value = true
     }
     
-    // Clean up on component unmount
-    onBeforeUnmount(() => {
-      if (subscription) {
-        subscription.unsubscribe()
+    // Handle player selection for away team
+    const handleAwayPlayerSelected = (player) => {
+      // For away team players, just open a basic stat modal
+      // Here we're using the position number since away team doesn't have real player data
+      openPlayerStatModal('away', player.jerseyNumber);
+    }
+
+    // Handle action selection from ActionPopup
+    const handleActionSelect = (action) => {
+      selectedAction.value = action
+      showActionPopup.value = false
+      showResultPopup.value = true
+    }
+
+    // Handle result selection from ResultPopup
+    const handleResultSelect = (result) => {
+      // Record the stat with player ID, action, and result
+      const newStat = {
+        team: 'home', // Assume it's always for the home team
+        playerId: dynamicSelectedPlayer.value.id,
+        playerName: dynamicSelectedPlayer.value.name,
+        playerNumber: dynamicSelectedPlayer.value.jerseyNumber,
+        statType: selectedAction.value,
+        quality: result,
+        timestamp: new Date()
       }
-    })
-    
-    // Auto-save on interval
-    let autoSaveInterval
-    
-    onMounted(async () => {
-      await loadGame()
-      setupRealtimeSubscription()
       
-      // Auto-save every minute
-      autoSaveInterval = setInterval(() => {
-        saveGame()
-      }, 60000) // 1 minute
-    })
-    
-    onBeforeUnmount(() => {
-      clearInterval(autoSaveInterval)
-    })
-    
+      // Add to stats history
+      playerStats.value.push(newStat)
+      console.log('Recorded stat:', newStat, 'Total stats:', playerStats.value.length)
+      
+      // Handle scoring based on the result
+      if (result === '+') {
+        // Good play with point - award a point to the player's team
+        updateScore('home', 1)
+      } else if (result === '-') {
+        // Error - award a point to the opposing team
+        updateScore('away', 1)
+      }
+      
+      // Reset state
+      closePopups()
+    }
+
+    // Close all popups
+    const closePopups = () => {
+      showActionPopup.value = false
+      showResultPopup.value = false
+      dynamicSelectedPlayer.value = null
+      selectedAction.value = null
+    }
+
+    // Return all the reactive properties and methods for the template
     return {
       game,
+      playerPositions,
       isSaving,
       isServing,
+      showStatsSummary,
       currentSetIndex,
-      currentSet,
       setHistory,
+      currentSet,
       timeouts,
+      showStatModal,
+      selectedPlayer,
+      selectedStatType,
+      statTypes,
+      playerStats,
+      teamPlayers,
+      courtPositions,
+      getPlayerInPosition,
+      assignPlayerToPosition,
+      rotatePositions,
+      openPlayerStatModal,
+      closeStatModal,
+      recordStat,
       setsWon,
       matchComplete,
-      canFinishSet,
+      isSetAfterMatchComplete,
+      isSetDecisive,
+      currentSetTargetScore,
+      getTargetScoreForSet,
       formatDate,
       updateScore,
       toggleServing,
       toggleTimeout,
+      canFinishSet,
       finishSet,
       resetSet,
+      loadGame,
       saveGame,
-      isSetAfterMatchComplete,
-      isSetDecisive,
-      currentSetTargetScore,
-      getTargetScoreForSet
+      showActionPopup,
+      showResultPopup,
+      selectedAction,
+      dynamicSelectedPlayer,
+      activeTeamId,
+      handlePlayerSelected,
+      handleAwayPlayerSelected,
+      handleActionSelect,
+      handleResultSelect,
+      closePopups,
+      sortedPlayers
     }
   }
 }

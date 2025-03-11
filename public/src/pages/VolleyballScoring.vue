@@ -2,7 +2,7 @@
   <DashboardLayout>
     <div class="container mx-auto p-4">
       <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold">Volleyball Scoring</h1>
+        <h1 class="text-3xl font-bold">Score</h1>
         <router-link 
           to="/matches" 
           class="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg flex items-center"

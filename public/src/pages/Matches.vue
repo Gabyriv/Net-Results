@@ -107,6 +107,18 @@
               </select>
             </div>
             
+            <!-- Season -->
+            <div>
+              <label class="block text-gray-700 mb-1">Season</label>
+              <input 
+                v-model="newGame.season" 
+                type="text" 
+                class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., 2024-2025"
+              />
+              <p class="text-xs text-gray-500 mt-1">Current season format is year-year (e.g., 2024-2025)</p>
+            </div>
+            
             <!-- Form Actions -->
             <div class="flex justify-end space-x-3 pt-2">
               <button 
@@ -199,76 +211,73 @@
                 <h4 class="text-lg font-bold">{{ selectedGame.myTeam }}</h4>
                 <p class="text-3xl font-bold mt-2">{{ selectedGame.myPts || 0 }}</p>
               </div>
-              <div class="text-xl font-bold">VS</div>
+              <div class="text-center">
+                <span class="text-gray-500">vs</span>
+              </div>
               <div class="text-center w-2/5">
                 <h4 class="text-lg font-bold">{{ selectedGame.oppTeam }}</h4>
                 <p class="text-3xl font-bold mt-2">{{ selectedGame.oppPts || 0 }}</p>
               </div>
             </div>
             
-            <!-- Set Scores -->
-            <div class="border-t border-b py-4">
-              <h4 class="text-lg font-semibold mb-3">Set Scores</h4>
-              <div v-if="parsedSetScores.length > 0" class="overflow-x-auto">
+            <!-- Set Scores Table -->
+            <div v-if="parsedSetScores.length > 0" class="pt-4 border-t">
+              <h4 class="font-bold text-lg mb-2">Set Scores</h4>
+              <div class="overflow-x-auto">
                 <table class="min-w-full">
-                  <thead>
+                  <thead class="bg-gray-50">
                     <tr>
-                      <th class="px-2 py-2 text-left">Set</th>
-                      <th class="px-2 py-2 text-center">{{ selectedGame.myTeam }}</th>
-                      <th class="px-2 py-2 text-center">{{ selectedGame.oppTeam }}</th>
-                      <th class="px-2 py-2 text-right">Winner</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Set</th>
+                      <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ selectedGame.myTeam }}</th>
+                      <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{{ selectedGame.oppTeam }}</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Winner</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody class="bg-white">
                     <tr v-for="(set, index) in parsedSetScores" :key="index" class="border-t border-gray-200">
-                      <td class="px-2 py-2 text-left">{{ index + 1 }}</td>
-                      <td class="px-2 py-2 text-center font-medium">{{ set.homeScore }}</td>
-                      <td class="px-2 py-2 text-center font-medium">{{ set.awayScore }}</td>
-                      <td class="px-2 py-2 text-right">
-                        <span v-if="set.homeScore > set.awayScore" class="text-green-600">{{ selectedGame.myTeam }}</span>
-                        <span v-else-if="set.awayScore > set.homeScore" class="text-red-600">{{ selectedGame.oppTeam }}</span>
-                        <span v-else class="text-gray-600">Tie/Ongoing</span>
+                      <td class="px-4 py-2 text-left">{{ index + 1 }}</td>
+                      <td class="px-4 py-2 text-center font-medium">{{ getHomeScore(set) }}</td>
+                      <td class="px-4 py-2 text-center font-medium">{{ getAwayScore(set) }}</td>
+                      <td class="px-4 py-2 text-right">
+                        <span 
+                          :class="getHomeScore(set) > getAwayScore(set) ? 'text-green-600' : 'text-red-600'"
+                        >
+                          {{ getHomeScore(set) > getAwayScore(set) ? selectedGame.myTeam : selectedGame.oppTeam }}
+                        </span>
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div v-else class="text-center text-gray-500 py-2">
-                No set data available
+              
+              <!-- Sets Summary -->
+              <div class="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <p class="text-gray-600 text-sm">Number of Sets:</p>
+                  <p class="font-semibold">{{ parsedSetScores.length }} (Best of {{ selectedGame.maxSets || selectedGame.sets }})</p>
+                </div>
+                <div>
+                  <p class="text-gray-600 text-sm">Result:</p>
+                  <p class="font-semibold">
+                    <span 
+                      :class="selectedGame.myPts > selectedGame.oppPts ? 'text-green-600' : 'text-red-600'"
+                    >
+                      {{ selectedGame.myPts > selectedGame.oppPts ? 'Win' : 'Loss' }}
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
             
-            <!-- Game Details -->
-            <div class="grid grid-cols-2 gap-4 border-t pt-4">
-              <div>
-                <p class="text-gray-600">Number of Sets:</p>
-                <p class="font-semibold">{{ selectedGame.sets }} (Best of {{ selectedGame.maxSets || selectedGame.sets }})</p>
-              </div>
-              <div>
-                <p class="text-gray-600">Result:</p>
-                <p class="font-semibold">
-                  <span 
-                    :class="selectedGame.myPts > selectedGame.oppPts ? 'text-green-600' : (selectedGame.myPts < selectedGame.oppPts ? 'text-red-600' : 'text-gray-600')"
-                  >
-                    {{ selectedGame.myPts > selectedGame.oppPts ? 'Win' : (selectedGame.myPts < selectedGame.oppPts ? 'Loss' : 'Tie/Not Finished') }}
-                  </span>
-                </p>
-              </div>
-            </div>
-            
-            <!-- Actions -->
-            <div class="flex justify-end space-x-3 pt-4 border-t">
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap justify-center gap-3 pt-4 border-t">
+              <!-- Delete Game Button -->
               <button 
-                @click="showDeleteConfirmation = true"
-                class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
+                @click="confirmDelete(selectedGame)"
+                class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center"
               >
-                Delete Game
-              </button>
-              <button 
-                @click="closeGameOverview"
-                class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
-              >
-                Close
+                <span class="material-icons mr-2">delete</span>
+                Delete
               </button>
             </div>
           </div>
@@ -369,7 +378,7 @@ export default {
         
         // Filter out sets that weren't actually played and limit to maxSets
         scoresArray = scoresArray.filter(set => 
-          (set.homeScore > 0 || set.awayScore > 0) && !set.notPlayed
+          (getHomeScore(set) > 0 || getAwayScore(set) > 0) && !set.notPlayed && !set.placeholder
         );
         
         // Ensure we never show more sets than the match format allows
@@ -385,6 +394,34 @@ export default {
         return [];
       }
     });
+    
+    // Get the home team's score from a set object, handling different property formats
+    const getHomeScore = (set) => {
+      if (!set) return 0;
+      
+      // Check different possible property names for the home score
+      if (set.myTeam !== undefined) return set.myTeam;
+      if (set.homeScore !== undefined) return set.homeScore;
+      
+      // If we have an object with myTeam property
+      if (set.home !== undefined) return set.home;
+      
+      return 0;
+    };
+    
+    // Get the away team's score from a set object, handling different property formats
+    const getAwayScore = (set) => {
+      if (!set) return 0;
+      
+      // Check different possible property names for the away score
+      if (set.oppTeam !== undefined) return set.oppTeam;
+      if (set.awayScore !== undefined) return set.awayScore;
+      
+      // If we have an object with oppTeam property
+      if (set.away !== undefined) return set.away;
+      
+      return 0;
+    };
     
     // Select a team from the dropdown
     const selectMyTeam = (team) => {
@@ -432,7 +469,8 @@ export default {
       game: '',
       myTeam: '',
       oppTeam: '',
-      sets: 3
+      sets: 3,
+      season: ''
     })
     
     // Auto-generate game name when team names change
@@ -460,6 +498,25 @@ export default {
         newGame.value.game = ''
       }
     })
+    
+    // Reset form to default values
+    const resetForm = () => {
+      newGame.value = {
+        game: '',
+        myTeam: '',
+        oppTeam: '',
+        sets: 3,
+        season: getCurrentSeason()
+      }
+      showMyTeamSuggestions.value = false
+    }
+    
+    // Get current season in YYYY-YYYY format
+    const getCurrentSeason = () => {
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      return `${currentYear}-${currentYear + 1}`;
+    }
     
     // Reset error and form when opening the modal
     const openCreateForm = async () => {
@@ -489,35 +546,6 @@ export default {
       showMyTeamSuggestions.value = false
     }
     
-    // Filter games based on search query
-    const filteredGames = computed(() => {
-      if (!searchQuery.value) return games.value
-      
-      const query = searchQuery.value.toLowerCase()
-      return games.value.filter(game => 
-        game.game.toLowerCase().includes(query) ||
-        game.myTeam.toLowerCase().includes(query) ||
-        game.oppTeam.toLowerCase().includes(query)
-      )
-    })
-    
-    // Format date for display
-    const formatDate = (dateString) => {
-      const date = new Date(dateString)
-      return date.toLocaleDateString()
-    }
-    
-    // Reset form to default values
-    const resetForm = () => {
-      newGame.value = {
-        game: '',
-        myTeam: '',
-        oppTeam: '',
-        sets: 3
-      }
-      showMyTeamSuggestions.value = false
-    }
-    
     // Handle form submission
     const handleCreateGame = async () => {
       error.value = '' // Clear any previous errors
@@ -530,6 +558,8 @@ export default {
           oppPts: 0,
           // Set maxSets to the same value as sets
           maxSets: newGame.value.sets,
+          // Set season if not provided
+          season: newGame.value.season || getCurrentSeason(),
           // ServingTeam will use the database default
           // Initialize empty JSON strings for new fields
           setScores: '{}',
@@ -541,16 +571,23 @@ export default {
         console.log('Sending game data without servingTeam to use default:', gameData);
         
         const result = await createGame(gameData)
-        if (result) {
+        console.log('Game creation result:', result);
+        
+        if (result && result.id) {
           // Reset form and close modal on success
           resetForm()
           showCreateForm.value = false
           
           // Redirect to the volleyball scoring page for the new game
+          console.log('Redirecting to volleyball scoring page with ID:', result.id);
           router.push(`/volleyball-scoring/${result.id}`)
+        } else {
+          console.error('Invalid game creation result:', result);
+          error.value = 'Failed to create game: Invalid response from server'
         }
       } catch (err) {
         console.error('Error in form submission:', err)
+        error.value = `Failed to create game: ${err.message || 'Unknown error'}`
       }
     }
     
@@ -593,6 +630,30 @@ export default {
       }
     }
 
+    // Open delete confirmation dialog
+    const confirmDelete = (game) => {
+      selectedGame.value = game
+      showDeleteConfirmation.value = true
+    }
+
+    // Filter games based on search query
+    const filteredGames = computed(() => {
+      if (!searchQuery.value) return games.value
+      
+      const query = searchQuery.value.toLowerCase()
+      return games.value.filter(game => 
+        game.game.toLowerCase().includes(query) ||
+        game.myTeam.toLowerCase().includes(query) ||
+        game.oppTeam.toLowerCase().includes(query)
+      )
+    })
+    
+    // Format date for display
+    const formatDate = (dateString) => {
+      const date = new Date(dateString)
+      return date.toLocaleDateString()
+    }
+
     // Return all the reactive properties and methods
     return { 
       games, 
@@ -617,10 +678,13 @@ export default {
       openGameOverview,
       closeGameOverview,
       parsedSetScores,
+      getHomeScore,
+      getAwayScore,
       // Delete game
       showDeleteConfirmation,
       isDeleting,
       handleDeleteGame,
+      confirmDelete,
       // Fetch games data
       fetchGamesData
     }

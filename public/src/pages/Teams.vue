@@ -417,7 +417,8 @@
                       <div
                         v-for="(player, playerIndex) in getVisiblePlayers(team)"
                         :key="player.id"
-                        class="py-2 flex justify-between items-center"
+                        class="py-2 flex justify-between items-center cursor-pointer hover:bg-blue-50 px-2 rounded"
+                        @click.stop="viewPlayerStats(player, team)"
                       >
                         <div>
                           <p class="font-medium">{{ player.displayName }}</p>
@@ -486,7 +487,8 @@
                     <div
                       v-for="(player, playerIndex) in selectedTeam.players"
                       :key="player.id"
-                      class="py-2 flex justify-between items-center"
+                      class="py-2 flex justify-between items-center cursor-pointer hover:bg-blue-50 px-2 rounded"
+                      @click.stop="viewPlayerStats(player, selectedTeam)"
                     >
                       <div>
                         <p class="font-medium">{{ player.displayName }}</p>
@@ -500,7 +502,7 @@
                         <!-- Edit button -->
                         <button
                           v-if="user?.role === 'Manager' || (user?.role === 'TeamManager' && user?.id === selectedTeam.managerId)"
-                          @click="editPlayer(player)"
+                          @click.stop="editPlayer(player, $event)"
                           class="text-blue-600 hover:text-blue-800"
                           title="Edit Player"
                         >
@@ -512,7 +514,7 @@
                         <!-- Delete button -->
                         <button
                           v-if="user?.role === 'Manager' || (user?.role === 'TeamManager' && user?.id === selectedTeam.managerId)"
-                          @click="confirmDeletePlayer(player)"
+                          @click.stop="confirmDeletePlayer(player, $event)"
                           class="text-red-600 hover:text-red-800"
                           title="Delete Player"
                         >
@@ -621,15 +623,125 @@
       </form>
     </div>
   </div>
+
+  <!-- Player Stats Modal -->
+  <div v-if="showPlayerStats" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl overflow-y-auto max-h-[90vh]">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold">{{ selectedPlayer.displayName }} Statistics</h2>
+        <button
+          @click="closePlayerStats"
+          class="text-gray-500 hover:text-gray-700"
+          title="Close"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <div class="mb-4 bg-blue-50 p-3 rounded-lg">
+        <div class="flex flex-wrap justify-between items-center">
+          <div>
+            <p class="text-lg">
+              <span class="font-medium">Team:</span> {{ selectedPlayerTeam?.name || 'No Team' }}
+            </p>
+            <p class="text-lg">
+              <span v-if="selectedPlayer.jerseyNumber || selectedPlayer.number" class="font-medium">Jersey:</span>
+              <span v-if="selectedPlayer.jerseyNumber">#{{ selectedPlayer.jerseyNumber }}</span>
+              <span v-else-if="selectedPlayer.number">#{{ selectedPlayer.number }}</span>
+              <span v-if="selectedPlayer.gamesPlayed" class="ml-3 font-medium">Games Played:</span>
+              <span v-if="selectedPlayer.gamesPlayed">{{ selectedPlayer.gamesPlayed }}</span>
+            </p>
+          </div>
+          
+          <div>
+            <router-link 
+              :to="`/player/${selectedPlayer.id}/stats`" 
+              class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              View Full Stats
+            </router-link>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Player Stats View -->
+      <div v-if="playerStats.loading" class="flex justify-center items-center py-8">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+      
+      <div v-else-if="playerStats.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <p>{{ playerStats.error }}</p>
+      </div>
+      
+      <div v-else-if="!playerStats.data || playerStats.data.length === 0" class="text-center py-8">
+        <p class="text-gray-500 text-lg">No statistics available for this player yet.</p>
+        <p class="text-gray-500 mt-2">Statistics will appear here once this player participates in games.</p>
+      </div>
+      
+      <div v-else class="space-y-6">
+        <!-- Stats Summary Card -->
+        <div class="bg-gray-50 p-4 rounded-lg">
+          <h3 class="text-xl font-semibold mb-3">Stats Summary</h3>
+          
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div v-for="(value, type) in playerStatsAggregated" :key="type" class="bg-white p-3 rounded-md shadow-sm text-center">
+              <p class="font-bold text-2xl text-blue-600">{{ value }}</p>
+              <p class="text-sm text-gray-500">{{ formatStatType(type) }}</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Stats Chart -->
+        <div class="bg-white p-4 rounded-lg shadow-sm">
+          <h3 class="text-xl font-semibold mb-3">Stats by Type</h3>
+          <div class="h-64">
+            <canvas id="statsChart" ref="statsChart"></canvas>
+          </div>
+        </div>
+        
+        <!-- Detailed Stats Table -->
+        <div class="bg-white p-4 rounded-lg shadow-sm">
+          <h3 class="text-xl font-semibold mb-3">Recent Stats</h3>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Game</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stat Type</th>
+                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="(stat, index) in playerStats.data.slice(0, 10)" :key="index" class="hover:bg-gray-50">
+                  <td class="px-4 py-2 whitespace-nowrap">{{ formatDate(stat.created_at) }}</td>
+                  <td class="px-4 py-2 whitespace-nowrap">{{ stat.gameName || 'Game ' + stat.gameId }}</td>
+                  <td class="px-4 py-2 whitespace-nowrap">{{ formatStatType(stat.statType) }}</td>
+                  <td class="px-4 py-2 whitespace-nowrap text-right font-medium">{{ stat.value }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
-import { onMounted, ref, computed, nextTick, defineAsyncComponent } from 'vue'
+import { onMounted, ref, computed, nextTick, defineAsyncComponent, reactive } from 'vue'
 import { useTeams } from '../composable/useTeams'
 import { useAuth } from '../composable/useAuth'
 import { usePlayers } from '../composable/usePlayers'
 import DefaultLayout from "../layouts/DefaultLayout.vue"
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
+import Chart from 'chart.js/auto'
 
 // Lazy load the LoadingSpinner component
 const LoadingSpinner = defineAsyncComponent(() =>
@@ -644,6 +756,7 @@ export default {
     const { user, initAuth } = useAuth()
     const { updatePlayerById, deletePlayerById } = usePlayers()
     const route = useRoute();
+    const router = useRouter();
 
     const newTeam = ref({
       name: '',
@@ -668,6 +781,17 @@ export default {
     const showPlayerEditForm = ref(false)
     const playerEditError = ref(null)
     const playerEditLoading = ref(false)
+
+    // Player stats state
+    const showPlayerStats = ref(false)
+    const selectedPlayer = ref(null)
+    const selectedPlayerTeam = ref(null)
+    const playerStats = reactive({
+      loading: false,
+      error: null,
+      data: [],
+      chart: null
+    })
 
     // Computed property for visible teams (pagination)
     const visibleTeams = computed(() => {
@@ -846,8 +970,7 @@ export default {
 
     // Function to view team details
     const viewTeamDetails = (team) => {
-      selectedTeam.value = team
-      showTeamDetails.value = true
+      router.push({ name: 'TeamDetails', params: { id: team.id } });
     }
 
     // Function to close team details modal
@@ -979,6 +1102,149 @@ export default {
       }
     }
 
+    // Function to view player stats
+    const viewPlayerStats = async (player, team) => {
+      selectedPlayer.value = player
+      selectedPlayerTeam.value = team
+      showPlayerStats.value = true
+      
+      // Reset stats data
+      playerStats.data = []
+      playerStats.error = null
+      playerStats.loading = true
+      
+      try {
+        // Fetch player stats from our new player stats API
+        const response = await axios.get(`/api/players/${player.id}/stats`)
+        
+        if (response.data && response.data.data) {
+          playerStats.data = response.data.data || []
+          console.log('Player stats loaded:', playerStats.data)
+        } else {
+          console.warn('No player stats data found in response:', response)
+          playerStats.data = []
+        }
+        
+        // Setup chart in the next tick after the DOM is updated
+        nextTick(() => {
+          setupStatsChart()
+        })
+      } catch (error) {
+        console.error('Error fetching player stats:', error)
+        playerStats.error = 'Failed to load player statistics. Please try again.'
+      } finally {
+        playerStats.loading = false
+      }
+    }
+
+    // Function to setup the stats chart
+    const setupStatsChart = () => {
+      // Clean up previous chart if it exists
+      if (playerStats.chart) {
+        playerStats.chart.destroy()
+      }
+      
+      const chartElement = document.querySelector('#statsChart')
+      if (!chartElement || !playerStatsAggregated.value || Object.keys(playerStatsAggregated.value).length === 0) {
+        console.log('Cannot setup chart: missing element or no stats data')
+        return
+      }
+      
+      const ctx = chartElement.getContext('2d')
+      
+      // Prepare chart data
+      const labels = Object.keys(playerStatsAggregated.value).map(type => formatStatType(type))
+      const data = Object.values(playerStatsAggregated.value)
+      
+      // Define colors for different stat types
+      const backgroundColors = [
+        'rgba(54, 162, 235, 0.6)', // SERVE
+        'rgba(255, 99, 132, 0.6)',  // PASS
+        'rgba(255, 206, 86, 0.6)',  // SET
+        'rgba(75, 192, 192, 0.6)',   // ATTACK
+        'rgba(153, 102, 255, 0.6)',   // BLOCK
+        'rgba(255, 159, 64, 0.6)'   // DIG
+      ]
+      
+      const borderColors = [
+        'rgba(54, 162, 235, 1)',
+        'rgba(255, 99, 132, 1)',
+        'rgba(255, 206, 86, 1)',
+        'rgba(75, 192, 192, 1)',
+        'rgba(153, 102, 255, 1)',
+        'rgba(255, 159, 64, 1)'
+      ]
+      
+      // Chart configuration
+      playerStats.chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Player Stats',
+            data: data,
+            backgroundColor: backgroundColors.slice(0, labels.length),
+            borderColor: borderColors.slice(0, labels.length),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: `${selectedPlayer.value.displayName}'s Statistics`,
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `Value: ${context.raw}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Value'
+              }
+            }
+          }
+        }
+      })
+    }
+
+    // Format stat type for display
+    const formatStatType = (statType) => {
+      if (!statType) return ''
+      return statType.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    }
+
+    // Format date for display
+    const formatDate = (dateString) => {
+      if (!dateString) return 'N/A'
+      const date = new Date(dateString)
+      return date.toLocaleDateString()
+    }
+
+    // Function to close player stats modal
+    const closePlayerStats = () => {
+      showPlayerStats.value = false
+      
+      // Clean up chart when closing modal
+      if (playerStats.chart) {
+        playerStats.chart.destroy()
+        playerStats.chart = null
+      }
+    }
+
     // Initialize component with optimized loading sequence
     onMounted(async () => {
       // Initialize auth first
@@ -1038,6 +1304,48 @@ export default {
       }
     })
 
+    // Computed property to aggregate player stats by type
+    const playerStatsAggregated = computed(() => {
+      if (!playerStats.data || playerStats.data.length === 0) return {}
+
+      // Group stats by type and calculate total values
+      const totals = {}
+      
+      playerStats.data.forEach(stat => {
+        if (!stat.statType) return
+        
+        // Convert to uppercase to ensure consistency
+        const statType = stat.statType.toUpperCase()
+        
+        if (!totals[statType]) {
+          totals[statType] = 0
+        }
+        
+        // Make sure to convert value to number before adding
+        const numericValue = parseFloat(stat.value) || 0
+        totals[statType] += numericValue
+      })
+      
+      // Sort the stats in a consistent order: HITTING, BLOCKING, PASSING, SERVING, DIGGING
+      const orderedStats = {}
+      const statOrder = ['HITTING', 'BLOCKING', 'PASSING', 'SERVING', 'DIGGING']
+      
+      // First add the stats that are in our predefined order
+      statOrder.forEach(type => {
+        if (totals[type] !== undefined) {
+          orderedStats[type] = totals[type]
+          delete totals[type]
+        }
+      })
+      
+      // Then add any remaining stats we didn't account for
+      Object.keys(totals).sort().forEach(type => {
+        orderedStats[type] = totals[type]
+      })
+      
+      return orderedStats
+    })
+
     return {
       teams,
       availablePlayers,
@@ -1083,7 +1391,17 @@ export default {
       cancelEditPlayer,
       savePlayerEdit,
       // Player deletion
-      confirmDeletePlayer
+      confirmDeletePlayer,
+      // New player stats functionality
+      showPlayerStats,
+      selectedPlayer,
+      selectedPlayerTeam,
+      playerStats,
+      playerStatsAggregated,
+      viewPlayerStats,
+      closePlayerStats,
+      formatStatType,
+      formatDate
     }
   },
 }

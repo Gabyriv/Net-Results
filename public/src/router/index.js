@@ -5,6 +5,7 @@ const Home = () => import('../pages/Home.vue')
 const Dashboard = () => import('../pages/Dashboard.vue')
 const Players = () => import('../pages/Players.vue')
 const Teams = () => import('../pages/Teams.vue')
+const TeamDetails = () => import('../pages/TeamDetails.vue')
 const Matches = () => import('../pages/Matches.vue')
 const Statistics = () => import('../pages/Statistics.vue')
 const Login = () => import('../pages/Login.vue')
@@ -12,6 +13,7 @@ const Register = () => import('../pages/Register.vue')
 const FetchApi = () => import('../components/FetchApi.vue')
 const FetchData = () => import('../components/FetchData.vue')
 const VolleyballScoring = () => import('../pages/VolleyballScoring.vue')
+const GameStats = () => import('../pages/GameStats.vue')
 
 const routes = [
   { path: '/' , redirect: '/home' },
@@ -31,6 +33,13 @@ const routes = [
     path: '/teams', 
     name: 'Teams', 
     component: Teams,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/teams/:id',
+    name: 'TeamDetails',
+    component: TeamDetails,
+    props: true,
     meta: { requiresAuth: true }
   },
   { 
@@ -60,6 +69,13 @@ const routes = [
     path: '/volleyball-scoring/:id',
     name: 'VolleyballScoring',
     component: VolleyballScoring,
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/games/:id/stats',
+    name: 'GameStats',
+    component: GameStats,
     props: true,
     meta: { requiresAuth: true }
   },

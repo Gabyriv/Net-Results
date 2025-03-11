@@ -12,6 +12,7 @@
             class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-blue-500"
             placeholder="Enter your email"
             required
+            :disabled="loading"
           />
         </div>
         <div class="mb-8">
@@ -23,17 +24,19 @@
             class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-blue-500"
             placeholder="Enter your password"
             required
+            :disabled="loading"
           />
         </div>
-        <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-lg hover:from-blue-600 hover:to-blue-800 transition duration-300">
-          Login
+        <button 
+          type="submit" 
+          class="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-lg hover:from-blue-600 hover:to-blue-800 transition duration-300"
+          :disabled="loading"
+        >
+          {{ loading ? 'Logging in...' : 'Login' }}
         </button>
       </form>
       <div v-if="errorMessage && errorMessage.length > 0" class="mt-6 text-red-500 text-center">
         {{ errorMessage }}
-      </div>
-      <div v-if="loading" class="mt-6 text-blue-500 text-center">
-        Processing your request...
       </div>
       <div class="mt-6 text-center">
         <router-link to="/register" class="text-blue-600 hover:underline">Don't have an account? Register</router-link>
