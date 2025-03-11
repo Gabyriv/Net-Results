@@ -5,6 +5,49 @@ import { withAuth } from "../../../../../utils/auth-utils";
 import { v4 as uuidv4 } from 'uuid';
 import { Role } from "@prisma/client";
 
+// Add GET endpoint to fetch team players
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    return withAuth(request, async () => {
+        try {
+            // Await the params object first to get id
+            const { id: teamId } = await params;
+            
+            // Check if team exists
+            const team = await prismaClient.team.findUnique({
+                where: { id: teamId },
+                include: { 
+                    players: true 
+                }
+            });
+            
+            if (!team) {
+                return NextResponse.json(
+                    { error: 'Team not found' },
+                    { status: 404 }
+                );
+            }
+
+            // Format players to match the frontend expectations
+            const formattedPlayers = team.players.map(player => ({
+                id: player.id,
+                name: player.displayName,
+                jerseyNumber: player.number?.toString() || '0'
+            }));
+
+            return NextResponse.json({
+                success: true,
+                data: formattedPlayers
+            }, { status: 200 });
+        } catch (error) {
+            console.error('Error fetching team players:', error);
+            return handleServerError(error);
+        }
+    });
+}
+
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }

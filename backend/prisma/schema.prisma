@@ -64,7 +64,9 @@ model Game {
   currentSet  Int          @default(0) @db.SmallInt
   servingTeam ServingTeam? @default(Home)
   userId      String
+  season      String?
   user        User         @relation(fields: [userId], references: [id])
+  playerStats PlayerStat[]
 
   @@index([userId])
 }
@@ -76,11 +78,16 @@ model PlayerStat {
   dayOfGame  String
   playerId   String
   statId     Int
+  gameId     Int?
+  statType   StatType?
   player     Player   @relation(fields: [playerId], references: [id])
   stat       Stat     @relation(fields: [statId], references: [id])
+  game       Game?    @relation(fields: [gameId], references: [id])
 
   @@index([playerId])
   @@index([statId])
+  @@index([gameId])
+  @@index([statType])
 }
 
 model Stat {
@@ -97,4 +104,13 @@ enum Role {
 enum ServingTeam {
   Home
   Away
+}
+
+enum StatType {
+  SERVE
+  PASS
+  SET
+  ATTACK
+  BLOCK
+  DIG
 }
