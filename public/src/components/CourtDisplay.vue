@@ -7,33 +7,27 @@
       <p class="text-gray-600">No players found</p>
     </div>
     
-    <!-- Player Grid that displays actual players in the exact 3x2 layout shown in the screenshot -->
+    <!-- Dynamic Player Grid that displays all players -->
     <div v-else>
-      <!-- First row -->
-      <div class="grid grid-cols-3 gap-3 mb-3">
+      <!-- Use different grid layouts based on number of players -->
+      <div 
+        class="grid gap-2" 
+        :class="[
+          players.length <= 3 ? 'grid-cols-2' : 
+          players.length <= 8 ? 'grid-cols-3' : 
+          players.length <= 12 ? 'grid-cols-4' : 
+          'grid-cols-5'
+        ]"
+      >
         <div 
-          v-for="player in displayablePlayers.slice(0, 3)" 
+          v-for="player in sortedPlayers" 
           :key="player.id" 
           @click="$emit('player-selected', player)"
-          class="cursor-pointer bg-blue-100 hover:bg-blue-200 rounded-lg p-3 text-center transition-colors duration-150 border-2 border-blue-300"
+          class="cursor-pointer bg-blue-100 hover:bg-blue-200 rounded-lg p-2 text-center transition-colors duration-150 border-2 border-blue-300 mb-2"
           :class="{'border-blue-500': player.id.startsWith('position-')}"
         >
-          <div class="font-bold text-xl text-blue-800">{{ player.jerseyNumber }}</div>
-          <div class="text-sm text-blue-600">{{ player.name }}</div>
-        </div>
-      </div>
-      
-      <!-- Second row -->
-      <div class="grid grid-cols-3 gap-3">
-        <div 
-          v-for="player in displayablePlayers.slice(3, 6)" 
-          :key="player.id" 
-          @click="$emit('player-selected', player)"
-          class="cursor-pointer bg-blue-100 hover:bg-blue-200 rounded-lg p-3 text-center transition-colors duration-150 border-2 border-blue-300"
-          :class="{'border-blue-500': player.id.startsWith('position-')}"
-        >
-          <div class="font-bold text-xl text-blue-800">{{ player.jerseyNumber }}</div>
-          <div class="text-sm text-blue-600">{{ player.name }}</div>
+          <div class="font-bold text-lg text-blue-800">{{ player.jerseyNumber }}</div>
+          <div class="text-xs text-blue-600 truncate" :title="player.name">{{ player.name }}</div>
         </div>
       </div>
     </div>
@@ -61,37 +55,23 @@ export default {
     }
   },
   setup(props) {
-    // Create a computed property that ensures we always have 6 player slots
-    // Use the actual players from the team roster, sorted by jersey number
-    // If we have fewer than 6 players, fill remaining slots with empty players
-    const displayablePlayers = computed(() => {
+    // Create a computed property that sorts players by jersey number
+    const sortedPlayers = computed(() => {
+      // If there are no players, return an empty array
+      if (!props.players || props.players.length === 0) {
+        return [];
+      }
+      
       // Sort players by jersey number
-      const sortedPlayers = [...props.players].sort((a, b) => {
+      return [...props.players].sort((a, b) => {
         const numA = parseInt(a.jerseyNumber) || 0;
         const numB = parseInt(b.jerseyNumber) || 0;
         return numA - numB;
       });
-      
-      // Make sure we have exactly 6 players (or placeholder objects)
-      const result = [...sortedPlayers];
-      
-      // If we have fewer than 6 players, add placeholder players
-      while (result.length < 6) {
-        const position = result.length + 1;
-        result.push({
-          id: `placeholder-${position}`,
-          name: `Position ${position}`,
-          jerseyNumber: position.toString(),
-          isPlaceholder: true
-        });
-      }
-      
-      // If we have more than 6 players, only use the first 6
-      return result.slice(0, 6);
     });
     
     return {
-      displayablePlayers
+      sortedPlayers
     };
   }
 };
