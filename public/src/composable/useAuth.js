@@ -8,9 +8,6 @@ const isAuthenticated = computed(() => !!user.value)
 const authError = ref(null)
 const loading = ref(false)
 
-// API base URL - use environment variable or default to '/api'
-const API_URL = '/api'
-
 // Configure axios defaults
 axios.defaults.withCredentials = true
 axios.defaults.headers.common['Content-Type'] = 'application/json'
@@ -106,7 +103,7 @@ export function useAuth() {
       // Ensure role is explicitly set, defaulting to Manager if not provided
       const role = userData.role || 'Manager'
       
-      const response = await axios.post(`${API_URL}/users`, {
+      const response = await axios.post('/users', {
         email: userData.email,
         password: userData.password,
         displayName: userData.displayName || userData.email.split('@')[0],
@@ -168,7 +165,7 @@ export function useAuth() {
       // Add a delay to ensure the request is properly sent
       await new Promise(resolve => setTimeout(resolve, 500))
       
-      const response = await axios.post(`${API_URL}/auth/login`, {
+      const response = await axios.post('/auth/login', {
         email: credentials.email,
         password: credentials.password
       }, {
@@ -241,7 +238,7 @@ export function useAuth() {
       console.log('Logging out user')
       
       // Call logout endpoint
-      await axios.post(`${API_URL}/auth/logout`, {}, {
+      await axios.post('/auth/logout', {}, {
         withCredentials: true,
         headers: {
           'Authorization': `Bearer ${user.value?.token || ''}`
@@ -296,7 +293,7 @@ export function useAuth() {
       // This provides two ways for the backend to access the token
       document.cookie = `auth_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; ${location.protocol === 'https:' ? 'secure; samesite=lax' : ''}`;
       
-      const response = await axios.get(`${API_URL}/auth/validate`, {
+      const response = await axios.get('/auth/validate', {
         headers: {
           Authorization: `Bearer ${token}`
         },

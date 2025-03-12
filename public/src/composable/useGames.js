@@ -24,8 +24,8 @@ export function useGames() {
     try {
       // If myGames is true, use the authenticated endpoint that filters for user's games
       const endpoint = options.myGames 
-        ? `${API_URL}/games/my-games` 
-        : `${API_URL}/games/list`
+        ? '/games/my-games' 
+        : '/games/list'
       
       const response = await axios.get(endpoint)
       
@@ -50,16 +50,16 @@ export function useGames() {
   }
 
   /**
-   * Fetch a single game by ID
-   * @param {number} id - Game ID to fetch
-   * @returns {Promise<Object>} - Game data or null if error
+   * Fetch a specific game by ID
+   * @param {string} id - Game ID to fetch
+   * @returns {Promise<Object|null>} The game data or null if not found
    */
   const fetchGameById = async (id) => {
     loading.value = true
     error.value = null
     
     try {
-      const response = await axios.get(`${API_URL}/games/${id}`)
+      const response = await axios.get(`/games/${id}`)
       
       if (response.data && response.data.success) {
         return response.data.data
@@ -152,18 +152,18 @@ export function useGames() {
   }
 
   /**
-   * Update a game's score and stats
-   * @param {number} id - Game ID to update
-   * @param {Object} gameData - Updated game data
-   * @returns {Promise<Object>} - Updated game or null if error
+   * Update a game's data
+   * @param {string} id - Game ID to update
+   * @param {Object} data - Updated game data
+   * @returns {Promise<Object>} The updated game data
    */
-  const updateGameScore = async (id, gameData) => {
+  const updateGameScore = async (id, data) => {
     loading.value = true
     error.value = null
     
     try {
       // Update to use the correct endpoint without /score
-      const response = await axios.put(`${API_URL}/games/${id}`, gameData)
+      const response = await axios.put(`${API_URL}/games/${id}`, data)
       
       if (response.data && response.data.success) {
         // Update the game in the games array
@@ -186,8 +186,8 @@ export function useGames() {
 
   /**
    * Delete a game
-   * @param {number} id - Game ID to delete
-   * @returns {Promise<boolean>} - Success status
+   * @param {string} id - Game ID to delete
+   * @returns {Promise<void>}
    */
   const deleteGame = async (id) => {
     loading.value = true

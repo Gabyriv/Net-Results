@@ -970,7 +970,8 @@ export default {
 
     // Function to view team details
     const viewTeamDetails = (team) => {
-      router.push({ name: 'TeamDetails', params: { id: team.id } });
+      selectedTeam.value = team
+      showTeamDetails.value = true
     }
 
     // Function to close team details modal

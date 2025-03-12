@@ -1,12 +1,10 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api';
-
 export const gameService = {
   // Get all games
   getAllGames: async () => {
     try {
-      const response = await axios.get(`${API_URL}/games/list`);
+      const response = await axios.get('/games/list');
       return response.data.data;
     } catch (error) {
       console.error('Error fetching games:', error);
@@ -17,7 +15,7 @@ export const gameService = {
   // Get only games created by the current user
   getMyGames: async () => {
     try {
-      const response = await axios.get(`${API_URL}/games/my-games`);
+      const response = await axios.get('/games/my-games');
       return response.data.data;
     } catch (error) {
       console.error('Error fetching user games:', error);
@@ -48,7 +46,7 @@ export const gameService = {
   // Create a new game
   createGame: async (gameData) => {
     try {
-      const response = await axios.post(`${API_URL}/games/create`, gameData);
+      const response = await axios.post('/games/create', gameData);
       return response.data.data;
     } catch (error) {
       console.error('Error creating game:', error);
@@ -59,7 +57,7 @@ export const gameService = {
   // Update game score (we'll need this for real-time updates)
   updateGame: async (id, gameData) => {
     try {
-      const response = await axios.put(`${API_URL}/games/${id}`, gameData);
+      const response = await axios.put(`/games/${id}`, gameData);
       return response.data.data;
     } catch (error) {
       console.error('Error updating game:', error);
@@ -70,7 +68,7 @@ export const gameService = {
   // Delete a game
   deleteGame: async (id) => {
     try {
-      const response = await axios.delete(`${API_URL}/games/${id}`);
+      const response = await axios.delete(`/games/${id}`);
       return response.data.success;
     } catch (error) {
       console.error('Error deleting game:', error);

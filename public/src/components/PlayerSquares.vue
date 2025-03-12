@@ -77,17 +77,19 @@ export default {
     };
     
     // Watch for team ID or name changes and refetch roster when either changes
-    watch([() => props.teamId, () => props.teamName], ([newTeamId, newTeamName]) => {
-      if (newTeamId || newTeamName) {
-        fetchRoster();
-      } else {
+    watch([() => props.teamId, () => props.teamName], ([newTeamId, newTeamName], [oldTeamId, oldTeamName]) => {
+      if ((newTeamId && newTeamId !== oldTeamId) || (newTeamName && newTeamName !== oldTeamName)) {
+        if (!players.value.length) {
+          fetchRoster();
+        }
+      } else if (!newTeamId && !newTeamName) {
         players.value = [];
       }
     });
     
-    // Fetch roster when component mounts
+    // Fetch roster when component mounts only if we don't have players yet
     onMounted(() => {
-      if (props.teamId || props.teamName) {
+      if ((props.teamId || props.teamName) && !players.value.length) {
         fetchRoster();
       }
     });

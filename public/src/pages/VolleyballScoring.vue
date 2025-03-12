@@ -61,7 +61,7 @@ export default {
     const { fetchGameById } = useGames()
     
     // Component state
-    const gameId = ref(null)
+    const gameId = ref(route.params.id)
     const game = ref(null)
     const loading = ref(true)
     const error = ref(null)
@@ -78,11 +78,7 @@ export default {
           throw new Error('Game ID is missing')
         }
         
-        gameId.value = parseInt(id)
-        
-        if (isNaN(gameId.value)) {
-          throw new Error('Invalid game ID format')
-        }
+        gameId.value = id
         
         console.log('Loading game with ID:', gameId.value)
         

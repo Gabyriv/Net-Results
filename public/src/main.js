@@ -5,17 +5,17 @@ import { createPinia } from 'pinia'
 import './styles/tailwind.css' 
 import axios from 'axios'
 
-// Configure axios defaults - use the base URL without the /api prefix
-// since the composables already include /api in their URLs
-axios.defaults.baseURL = ''
+// Configure axios defaults
+axios.defaults.baseURL = '/api' // Use relative URL to work with Vite proxy
 axios.defaults.withCredentials = true
 axios.defaults.headers.common['Content-Type'] = 'application/json'
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'
 
 // Add response interceptor to handle common errors
 axios.interceptors.response.use(
   response => response,
   error => {
-    // Prevent redundant error logging in production
+    // Log errors in development
     if (process.env.NODE_ENV !== 'production') {
       console.error('API Error:', error.response?.status, error.response?.data || error.message)
     }

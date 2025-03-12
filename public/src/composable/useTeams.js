@@ -2,12 +2,7 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { useAuth } from './useAuth'
 
-// API base URL
-const API_URL = '/api'
-
-// Configure axios defaults for CORS
-axios.defaults.withCredentials = true
-
+// Remove hardcoded API_URL since axios is already configured with base URL
 export function useTeams() {
   const teams = ref([])
   const availablePlayers = ref([])
@@ -39,7 +34,7 @@ export function useTeams() {
       
       const queryString = params.toString() ? `?${params.toString()}` : ''
       
-      const response = await axios.get(`${API_URL}/teams${queryString}`, {
+      const response = await axios.get(`/teams${queryString}`, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
@@ -66,7 +61,7 @@ export function useTeams() {
         throw new Error('Authentication required')
       }
 
-      const response = await axios.get(`${API_URL}/players?unassigned=true`, {
+      const response = await axios.get(`/players?unassigned=true`, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
@@ -94,7 +89,7 @@ export function useTeams() {
       }
 
       // First, create the team
-      const response = await axios.post(`${API_URL}/teams`, {
+      const response = await axios.post(`/teams`, {
         name: teamData.name
       }, {
         headers: {
@@ -125,7 +120,7 @@ export function useTeams() {
             for (let i = 0; i < mappedNewPlayers.length; i += BATCH_SIZE) {
               const batch = mappedNewPlayers.slice(i, i + BATCH_SIZE);
               
-              const batchResponse = await axios.post(`${API_URL}/teams/${teamToAdd.id}/players`, {
+              const batchResponse = await axios.post(`/teams/${teamToAdd.id}/players`, {
                 playerIds: [],
                 newPlayers: batch
               }, {
@@ -147,7 +142,7 @@ export function useTeams() {
             
             // Add existing players in a separate request if needed
             if (teamData.playerIds && teamData.playerIds.length > 0) {
-              const existingPlayersResponse = await axios.post(`${API_URL}/teams/${teamToAdd.id}/players`, {
+              const existingPlayersResponse = await axios.post(`/teams/${teamToAdd.id}/players`, {
                 playerIds: teamData.playerIds,
                 newPlayers: []
               }, {
@@ -166,7 +161,7 @@ export function useTeams() {
             teamToAdd.players = allPlayers;
           } else {
             // For small numbers of players, use a single request as before
-            const playersResponse = await axios.post(`${API_URL}/teams/${teamToAdd.id}/players`, {
+            const playersResponse = await axios.post(`/teams/${teamToAdd.id}/players`, {
               playerIds: teamData.playerIds || [],
               newPlayers: mappedNewPlayers
             }, {
@@ -210,7 +205,7 @@ export function useTeams() {
     error.value = null
     try {
       console.log(`Attempting to delete team with ID: ${teamId}`)
-      const response = await axios.delete(`${API_URL}/teams/${teamId}`, {
+      const response = await axios.delete(`/teams/${teamId}`, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
@@ -248,7 +243,7 @@ export function useTeams() {
         jerseyNumber: player.number
       }));
 
-      const response = await axios.put(`${API_URL}/teams/${teamId}`, {
+      const response = await axios.put(`/teams/${teamId}`, {
         name: teamData.name,
         playerIds: teamData.playerIds || [],
         newPlayers: mappedNewPlayers

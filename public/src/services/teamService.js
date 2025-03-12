@@ -11,10 +11,41 @@ export const getTeamRoster = async (teamIdOrName) => {
   }
 
   try {
+    // Get the base URL from environment or use default
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    
+    // Get the auth token from localStorage
+    const userStr = localStorage.getItem('user');
+    let authToken = null;
+    
+    if (userStr) {
+      try {
+        const userData = JSON.parse(userStr);
+        if (userData && userData.token) {
+          authToken = userData.token;
+        }
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+    
+    // Include the auth token in headers if available
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     // Try to get from API first using team ID
-    let apiUrl = `${import.meta.env.VITE_API_URL || '/api'}/teams/${teamIdOrName}/roster`;
+    let apiUrl = `${baseUrl}/teams/${teamIdOrName}/roster`;
     try {
-      let response = await fetch(apiUrl);
+      let response = await fetch(apiUrl, {
+        headers,
+        credentials: 'include' // Include cookies for fallback auth
+      });
+      
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
@@ -23,14 +54,29 @@ export const getTeamRoster = async (teamIdOrName) => {
       }
 
       // If ID lookup fails, try by team name
-      apiUrl = `${import.meta.env.VITE_API_URL || '/api'}/teams/roster?teamName=${encodeURIComponent(teamIdOrName)}`;
-      response = await fetch(apiUrl);
+      apiUrl = `${baseUrl}/teams/roster?teamName=${encodeURIComponent(teamIdOrName)}`;
+      response = await fetch(apiUrl, {
+        headers,
+        credentials: 'include'
+      });
+      
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           return data.data;
         }
       }
+      
+      // Log the response for debugging
+      console.log('API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      const responseText = await response.text();
+      console.log('API Response Text:', responseText);
+      
     } catch (apiError) {
       console.warn('API fetch failed, falling back to local storage:', apiError);
       // API fetch failed, continue to local storage options
@@ -40,12 +86,15 @@ export const getTeamRoster = async (teamIdOrName) => {
     const teamsData = localStorage.getItem('teams');
     if (teamsData) {
       const teams = JSON.parse(teamsData);
+      console.log('Teams found in localStorage:', teams);
+      
       // Try to find by ID first, then by name
       let team = teams.find(t => t.id === teamIdOrName || t._id === teamIdOrName);
       if (!team) {
         team = teams.find(t => t.name === teamIdOrName);
       }
       if (team && Array.isArray(team.players) && team.players.length > 0) {
+        console.log('Found team in teams localStorage:', team);
         return team.players.map(normalizePlayerData);
       }
     }
@@ -54,12 +103,15 @@ export const getTeamRoster = async (teamIdOrName) => {
     const myTeamsData = localStorage.getItem('myTeams');
     if (myTeamsData) {
       const myTeams = JSON.parse(myTeamsData);
+      console.log('Teams found in myTeams localStorage:', myTeams);
+      
       // Try to find by ID first, then by name
       let team = myTeams.find(t => t.id === teamIdOrName || t._id === teamIdOrName);
       if (!team) {
         team = myTeams.find(t => t.name === teamIdOrName);
       }
       if (team && Array.isArray(team.players) && team.players.length > 0) {
+        console.log('Found team in myTeams localStorage:', team);
         return team.players.map(normalizePlayerData);
       }
     }
@@ -75,16 +127,18 @@ export const getTeamRoster = async (teamIdOrName) => {
       );
       
       if (teamGames.length > 0) {
+        console.log('Found games for team:', teamGames.length);
         // Use the most recent game that has players
         for (const game of teamGames) {
           if (game.players && Array.isArray(game.players) && game.players.length > 0) {
+            console.log('Found players in game:', game);
             return game.players.map(normalizePlayerData);
           }
         }
       }
     }
 
-    // If we got here, no players were found
+    // If we get here, no players were found
     console.warn(`No players found for team: ${teamIdOrName}`);
     return [];
   } catch (error) {

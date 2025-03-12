@@ -392,7 +392,7 @@ export default {
   emits: ['exit', 'updated'],
   setup(props, { emit }) {
     const router = useRouter()
-    const { getPlayer } = useTeams()
+    const { getPlayer, createTeam } = useTeams()
     const { updateGameScore } = useGames()
     
     const game = ref({
@@ -571,12 +571,34 @@ export default {
           }
         }
         
-        // If we get here, we did not find any players
+        // If we get here, no players were found
         console.warn('No players found for team: ' + game.value.myTeam);
         
-        // Don't add hardcoded players when no players are found
-        teamPlayers.value = [];
-        console.log('No players found for team, setting empty array');
+        // Try to create the team if it doesn't exist
+        try {
+          const { createTeam } = useTeams();
+          const teamData = {
+            name: game.value.myTeam,
+            playerIds: [],
+            newPlayers: []
+          };
+          
+          console.log('Creating new team:', teamData);
+          const newTeam = await createTeam(teamData);
+          console.log('Team created successfully:', newTeam);
+          
+          // Save to localStorage for future use
+          const teams = JSON.parse(localStorage.getItem('teams') || '[]');
+          teams.push(newTeam);
+          localStorage.setItem('teams', JSON.stringify(teams));
+          
+          // Initialize empty players array
+          teamPlayers.value = [];
+          
+        } catch (createError) {
+          console.error('Error creating team:', createError);
+        }
+        
       } catch (error) {
         console.error('Error loading team roster:', error);
         
@@ -613,12 +635,29 @@ export default {
         playerName: selectedPlayer.value.name,
         statType: selectedStatType.value,
         quality: quality,
-        timestamp: new Date()
+        timestamp: new Date(),
+        saved: false // Track whether this stat has been saved to the database
       };
       
       // Add to stats history
       playerStats.value.push(newStat);
       console.log('Recorded stat:', newStat, 'Total stats:', playerStats.value.length);
+      
+      // Only try to save immediately if we have a real player (not an error entry)
+      if (newStat.playerId && newStat.playerNumber !== 'E') {
+        console.log('Attempting to immediately save stat for player:', newStat.playerName);
+        // Save the stat to the database
+        savePlayerStat(newStat).then((result) => {
+          // Mark as saved if successful
+          newStat.saved = true;
+          console.log('Successfully saved stat immediately:', result);
+        }).catch(error => {
+          // Log error but don't interrupt the game flow
+          console.error('Failed to save stat immediately, will retry during next save operation:', error);
+        });
+      } else {
+        console.log('Skipping immediate save for error entry or missing player ID');
+      }
       
       // Handle scoring based on the stat
       if (selectedPlayer.value.number === 'E') {
@@ -636,6 +675,140 @@ export default {
       
       // Close the modal
       closeStatModal();
+    }
+
+    // New function to save player stat to the database
+    const savePlayerStat = async (stat) => {
+      try {
+        // Skip if no player ID
+        if (!stat.playerId) {
+          console.log('Skipping database save for stat with no player ID', stat);
+          return;
+        }
+        
+        // Skip if already saved successfully
+        if (stat.saved) {
+          console.log('Skipping already saved stat:', stat);
+          return;
+        }
+
+        // Map of frontend stat types to backend enum values
+        const statTypeMap = {
+          'Serve': 'SERVE',
+          'Pass': 'PASS',
+          'Set': 'SET',
+          'Attack': 'ATTACK',
+          'Block': 'BLOCK',
+          'Dig': 'DIG'
+        };
+        
+        // Ensure statType is valid
+        const statType = statTypeMap[stat.statType];
+        if (!statType) {
+          console.error(`Invalid stat type: ${stat.statType}. Valid types are: ${Object.keys(statTypeMap).join(', ')}`);
+          return;
+        }
+        
+        // Convert quality to numeric value
+        let value;
+        if (stat.quality === '+') value = 3; // Point
+        else if (stat.quality === '=') value = 2; // Good
+        else if (stat.quality === '-') value = 1; // Error
+        else {
+          console.error(`Invalid quality value: ${stat.quality}. Valid values are: +, =, -`);
+          return;
+        }
+        
+        // Make sure we have a game ID before trying to save
+        if (!game.value || !game.value.id) {
+          console.error('Cannot save player stat: No game ID available');
+          return;
+        }
+        
+        // Prepare data for API request - exactly matching backend expectations
+        const statData = {
+          playerId: stat.playerId,
+          statType: statType,
+          value: value
+        };
+        
+        console.log('Preparing to save player stat to database:', statData);
+        
+        // Get the auth token from localStorage
+        const userStr = localStorage.getItem('user');
+        let authToken = null;
+        
+        if (userStr) {
+          try {
+            const userData = JSON.parse(userStr);
+            if (userData && userData.token) {
+              authToken = userData.token;
+            }
+          } catch (e) {
+            console.error('Error parsing user data:', e);
+          }
+        }
+        
+        // Include the auth token in headers if available
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        // Construct the full API URL ensuring correct format
+        const baseApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        // Trim any trailing slashes
+        const baseUrl = baseApiUrl.endsWith('/') ? baseApiUrl.slice(0, -1) : baseApiUrl;
+        const fullApiUrl = `${baseUrl}/api/games/${game.value.id}/player-stats`;
+        
+        // Debug the URL and data being sent
+        console.log(`Sending player stat to: ${fullApiUrl}`);
+        console.log('Request body:', JSON.stringify(statData));
+        
+        // Send the API request
+        const response = await fetch(fullApiUrl, {
+          method: 'POST',
+          headers,
+          credentials: 'include', // Include cookies for fallback auth
+          body: JSON.stringify(statData)
+        });
+        
+        // Get the response as text first for better debugging
+        const responseText = await response.text();
+        console.log(`Response status: ${response.status} ${response.statusText}`);
+        console.log('Response text:', responseText);
+        
+        // Try to parse the response as JSON for better error details
+        let responseJson;
+        try {
+          responseJson = JSON.parse(responseText);
+          console.log('Parsed response:', responseJson);
+        } catch (e) {
+          console.warn('Could not parse response as JSON:', e);
+        }
+        
+        if (!response.ok) {
+          // Get more detailed error information if available
+          const errorDetails = responseJson?.error || responseText;
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}. Details: ${errorDetails}`);
+        }
+        
+        // Use the parsed JSON if available, otherwise create a simple success object
+        const result = responseJson || { success: true, message: 'Stat saved (response was not JSON)' };
+        console.log('Successfully saved player stat to database:', result);
+        
+        // Mark the stat as saved
+        stat.saved = true;
+        return result;
+      } catch (error) {
+        console.error('Error saving player stat to database:', error);
+        // Don't show alert to user, just log the error
+        // We'll still keep the stat in memory so it's not lost
+        throw error; // Re-throw to let calling function know about the error
+      }
     }
 
     // Computed properties
@@ -809,7 +982,7 @@ export default {
       return false;
     });
 
-    // Finish the current set and start a new one
+    // Finish the current set
     const finishSet = () => {
       // Check if the set can be finished (need to win by 2)
       if (!canFinishSet.value) {
@@ -1048,14 +1221,8 @@ export default {
       await loadGame();
       console.log('Game loaded:', game.value);
       
-      // Load team roster explicitly after game is loaded
-      await loadTeamRoster();
-      console.log('Team roster loaded:', teamPlayers.value.length, 'players found');
-      if (teamPlayers.value.length > 0) {
-        console.log('Loaded players:', teamPlayers.value);
-      } else {
-        console.log('No players loaded for team:', game.value.myTeam);
-      }
+      // No need to load roster here as it will be handled by PlayerSquares component
+      // and the watch effect if needed
       
       // Rest of the onMounted function
       setupRealtimeSubscription()
@@ -1078,9 +1245,9 @@ export default {
       }, 60000) // 1 minute
     })
 
-    // Watch for team changes and reload roster
+    // Watch for team changes and reload roster only if necessary
     watch(() => game.value.myTeam, async (newTeam, oldTeam) => {
-      if (newTeam && newTeam !== oldTeam) {
+      if (newTeam && newTeam !== oldTeam && !teamPlayers.value.length) {
         console.log('Team changed from', oldTeam, 'to', newTeam, '- reloading roster');
         await loadTeamRoster();
       }
@@ -1091,6 +1258,10 @@ export default {
       if (isSaving.value) return;
       
       isSaving.value = true;
+      const startTime = Date.now();
+      let statsSaveAttempted = 0;
+      let statsSaveSucceeded = 0;
+      let gameUpdateSucceeded = false;
       
       try {
         // Prepare set scores for saving
@@ -1131,8 +1302,56 @@ export default {
             positions: playerPositions.value
           };
           notesString = JSON.stringify(notesData);
+          
+          // Save any unsaved player stats to the database
+          if (playerStats.value && playerStats.value.length > 0) {
+            console.log(`Saving player stats to database (${playerStats.value.length} total stats)`);
+            
+            // Count unsaved stats
+            const unsavedStats = playerStats.value.filter(stat => !stat.saved && stat.playerId && stat.playerNumber !== 'E');
+            console.log(`Found ${unsavedStats.length} unsaved player stats to save`);
+            
+            // Track stats that failed to save
+            const failedStats = [];
+            statsSaveAttempted = unsavedStats.length;
+            
+            // Use a smaller batch size and introduce delay to avoid overwhelming the server
+            const batchSize = 3;
+            for (let i = 0; i < unsavedStats.length; i += batchSize) {
+              const batch = unsavedStats.slice(i, i + batchSize);
+              console.log(`Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(unsavedStats.length/batchSize)}`);
+              
+              try {
+                const results = await Promise.allSettled(batch.map(async stat => {
+                  try {
+                    await savePlayerStat(stat);
+                    statsSaveSucceeded++;
+                    return { success: true, stat };
+                  } catch (saveError) {
+                    failedStats.push({stat, error: saveError.message});
+                    return { success: false, stat, error: saveError.message };
+                  }
+                }));
+                
+                console.log(`Batch results:`, results.map(r => r.status === 'fulfilled' ? r.value : r.reason));
+              } catch (batchError) {
+                console.error('Error processing batch of player stats:', batchError);
+              }
+              
+              // Small delay between batches to avoid rate limiting
+              if (i + batchSize < unsavedStats.length) {
+                console.log('Pausing between batches...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            }
+            
+            // Log all failed stats at once to make debugging easier
+            if (failedStats.length > 0) {
+              console.error(`Failed to save ${failedStats.length} player stats:`, failedStats);
+            }
+          }
         } catch (e) {
-          console.error('Error stringifying notes data:', e);
+          console.error('Error processing player stats:', e);
         }
         
         // Make sure setsWon is a proper object
@@ -1186,23 +1405,56 @@ export default {
             headers['Authorization'] = `Bearer ${authToken}`;
           }
           
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/games/${game.value.id}`, {
+          // Construct the correct API URL
+          const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          const url = `${apiBaseUrl}/api/games/${game.value.id}`;
+          
+          console.log('Sending PUT request to:', url);
+          
+          const response = await fetch(url, {
             method: 'PUT',
             headers,
             credentials: 'include', // Include cookies for fallback auth
             body: JSON.stringify(gameData)
           });
           
-          if (!response.ok) {
-            throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+          // Read the response and provide detailed error information if needed
+          const responseText = await response.text();
+          console.log(`Game update response: ${response.status} ${response.statusText}`);
+          
+          let responseJson;
+          try {
+            if (responseText) {
+              responseJson = JSON.parse(responseText);
+              console.log('Game update parsed response:', responseJson);
+            }
+          } catch (e) {
+            console.warn('Could not parse game update response as JSON:', e);
           }
+          
+          if (!response.ok) {
+            const errorDetails = responseJson?.error || responseText;
+            throw new Error(`Server responded with ${response.status}: ${response.statusText}. Details: ${errorDetails}`);
+          }
+          
+          gameUpdateSucceeded = true;
+          
+          // Show success message with stats count
+          const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+          alert(`Game saved successfully in ${totalTime}s.\n${statsSaveSucceeded} of ${statsSaveAttempted} player stats saved.`);
         } catch (error) {
           console.error('Error saving game:', error);
           throw error;
         }
       } catch (error) {
         console.error('Failed to save game:', error);
-        alert('Failed to save game. Please try again or consider saving a backup of your data.');
+        
+        // Show meaningful error message to the user
+        if (gameUpdateSucceeded) {
+          alert(`Game state was saved, but ${statsSaveAttempted - statsSaveSucceeded} of ${statsSaveAttempted} player stats failed to save. Your statistics may be incomplete.`);
+        } else {
+          alert('Failed to save game. Please try again or consider saving a backup of your data.');
+        }
       } finally {
         isSaving.value = false;
       }
@@ -1332,6 +1584,7 @@ export default {
       openPlayerStatModal,
       closeStatModal,
       recordStat,
+      savePlayerStat,
       setsWon,
       matchComplete,
       isSetAfterMatchComplete,
