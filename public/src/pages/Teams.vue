@@ -654,18 +654,6 @@
               <span v-if="selectedPlayer.gamesPlayed">{{ selectedPlayer.gamesPlayed }}</span>
             </p>
           </div>
-          
-          <div>
-            <router-link 
-              :to="`/player/${selectedPlayer.id}/stats`" 
-              class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              View Full Stats
-            </router-link>
-          </div>
         </div>
       </div>
       
@@ -685,47 +673,222 @@
       
       <div v-else class="space-y-6">
         <!-- Stats Summary Card -->
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <h3 class="text-xl font-semibold mb-3">Stats Summary</h3>
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow-sm">
+          <h3 class="text-xl font-semibold mb-4 text-indigo-800">Performance Summary</h3>
           
-          <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div v-for="(value, type) in playerStatsAggregated" :key="type" class="bg-white p-3 rounded-md shadow-sm text-center">
-              <p class="font-bold text-2xl text-blue-600">{{ value }}</p>
-              <p class="text-sm text-gray-500">{{ formatStatType(type) }}</p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-md shadow-sm text-center transform transition-transform duration-200 hover:scale-105">
+              <p class="font-bold text-3xl text-red-600">{{ countStatsByType('SERVE') + countStatsByType('ATTACK') }}</p>
+              <p class="text-sm font-medium text-gray-700">Offensive Points</p>
+            </div>
+            <div class="bg-white p-4 rounded-md shadow-sm text-center transform transition-transform duration-200 hover:scale-105">
+              <p class="font-bold text-3xl text-blue-600">{{ countStatsByType('BLOCK') + countStatsByType('DIG') }}</p>
+              <p class="text-sm font-medium text-gray-700">Defensive Points</p>
+            </div>
+            <div class="bg-white p-4 rounded-md shadow-sm text-center transform transition-transform duration-200 hover:scale-105">
+              <p class="font-bold text-3xl text-green-600">{{ countStatsByType('PASS') + countStatsByType('SET') }}</p>
+              <p class="text-sm font-medium text-gray-700">Ball Control</p>
+            </div>
+            <div class="bg-white p-4 rounded-md shadow-sm text-center transform transition-transform duration-200 hover:scale-105">
+              <p class="font-bold text-3xl text-purple-600">{{ playerStats.data.length }}</p>
+              <p class="text-sm font-medium text-gray-700">Total Actions</p>
             </div>
           </div>
         </div>
         
-        <!-- Stats Chart -->
-        <div class="bg-white p-4 rounded-lg shadow-sm">
-          <h3 class="text-xl font-semibold mb-3">Stats by Type</h3>
-          <div class="h-64">
-            <canvas id="statsChart" ref="statsChart"></canvas>
+        <!-- Main Stats Display -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Left Column - Stats by Category -->
+          <div class="space-y-4">
+            <h3 class="text-xl font-semibold text-indigo-800">Statistics by Category</h3>
+            
+            <!-- Offensive Stats Card -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div class="bg-red-100 px-4 py-2">
+                <h4 class="font-medium text-red-800">Offensive Stats</h4>
+              </div>
+              <div class="p-4">
+                <div v-if="getStatsByCategory('ATTACK').length > 0 || getStatsByCategory('SERVE').length > 0">
+                  <div v-for="statType in ['SERVE', 'ATTACK']" :key="statType" class="mb-4">
+                    <div class="flex justify-between py-2 border-b border-gray-200">
+                      <span class="text-gray-700 flex items-center font-medium">
+                        <span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
+                        {{ formatStatType(statType) }}
+                      </span>
+                      <span class="font-medium text-lg">{{ getStatsByCategory(statType).length }} total</span>
+                    </div>
+                    
+                    <div class="mt-2 space-y-2">
+                      <!-- Display percentages -->
+                      <div class="grid grid-cols-3 gap-2 mt-2">
+                        <div v-for="(label, index) in ['Point', 'Good', 'Error']" :key="`${statType}-${label}`" 
+                            class="bg-gray-50 rounded-md p-2 text-center">
+                          <div class="text-xl font-bold" :class="getStatValueColorClass(label)">
+                            {{ calculateStatValuePercentage(statType, 3 - index) }}%
+                          </div>
+                          <div class="text-sm text-gray-500">{{ label }}</div>
+                        </div>
+                      </div>
+                      
+                      <!-- Visual bar representation -->
+                      <div class="h-6 rounded-md bg-gray-200 overflow-hidden flex mt-2">
+                        <div v-for="(label, index) in ['Point', 'Good', 'Error']" :key="`${statType}-bar-${label}`"
+                            :style="`width: ${calculateStatValuePercentage(statType, 3 - index)}%`" 
+                            :class="getStatBarColorClass(label)"
+                            class="h-full">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-gray-500 text-sm py-2">No offensive stats recorded</div>
+              </div>
+            </div>
+            
+            <!-- Defensive Stats Card -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div class="bg-blue-100 px-4 py-2">
+                <h4 class="font-medium text-blue-800">Defensive Stats</h4>
+              </div>
+              <div class="p-4">
+                <div v-if="getStatsByCategory('BLOCK').length > 0 || getStatsByCategory('DIG').length > 0">
+                  <div v-for="statType in ['BLOCK', 'DIG']" :key="statType" class="mb-4">
+                    <div class="flex justify-between py-2 border-b border-gray-200">
+                      <span class="text-gray-700 flex items-center font-medium">
+                        <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                        {{ formatStatType(statType) }}
+                      </span>
+                      <span class="font-medium text-lg">{{ getStatsByCategory(statType).length }} total</span>
+                    </div>
+                    
+                    <div class="mt-2 space-y-2">
+                      <!-- Display percentages -->
+                      <div class="grid grid-cols-3 gap-2 mt-2">
+                        <div v-for="(label, index) in ['Point', 'Good', 'Error']" :key="`${statType}-${label}`" 
+                            class="bg-gray-50 rounded-md p-2 text-center">
+                          <div class="text-xl font-bold" :class="getStatValueColorClass(label)">
+                            {{ calculateStatValuePercentage(statType, 3 - index) }}%
+                          </div>
+                          <div class="text-sm text-gray-500">{{ label }}</div>
+                        </div>
+                      </div>
+                      
+                      <!-- Visual bar representation -->
+                      <div class="h-6 rounded-md bg-gray-200 overflow-hidden flex mt-2">
+                        <div v-for="(label, index) in ['Point', 'Good', 'Error']" :key="`${statType}-bar-${label}`"
+                            :style="`width: ${calculateStatValuePercentage(statType, 3 - index)}%`" 
+                            :class="getStatBarColorClass(label)"
+                            class="h-full">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-gray-500 text-sm py-2">No defensive stats recorded</div>
+              </div>
+            </div>
+            
+            <!-- Ball Control Stats Card -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div class="bg-green-100 px-4 py-2">
+                <h4 class="font-medium text-green-800">Ball Control</h4>
+              </div>
+              <div class="p-4">
+                <div v-if="getStatsByCategory('PASS').length > 0 || getStatsByCategory('SET').length > 0">
+                  <div v-for="statType in ['PASS', 'SET']" :key="statType" class="mb-4">
+                    <div class="flex justify-between py-2 border-b border-gray-200">
+                      <span class="text-gray-700 flex items-center font-medium">
+                        <span class="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+                        {{ formatStatType(statType) }}
+                      </span>
+                      <span class="font-medium text-lg">{{ getStatsByCategory(statType).length }} total</span>
+                    </div>
+                    
+                    <div class="mt-2 space-y-2">
+                      <!-- Display percentages -->
+                      <div class="grid grid-cols-3 gap-2 mt-2">
+                        <div v-for="(label, index) in ['Point', 'Good', 'Error']" :key="`${statType}-${label}`" 
+                            class="bg-gray-50 rounded-md p-2 text-center">
+                          <div class="text-xl font-bold" :class="getStatValueColorClass(label)">
+                            {{ calculateStatValuePercentage(statType, 3 - index) }}%
+                          </div>
+                          <div class="text-sm text-gray-500">{{ label }}</div>
+                        </div>
+                      </div>
+                      
+                      <!-- Visual bar representation -->
+                      <div class="h-6 rounded-md bg-gray-200 overflow-hidden flex mt-2">
+                        <div v-for="(label, index) in ['Point', 'Good', 'Error']" :key="`${statType}-bar-${label}`"
+                            :style="`width: ${calculateStatValuePercentage(statType, 3 - index)}%`" 
+                            :class="getStatBarColorClass(label)"
+                            class="h-full">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-gray-500 text-sm py-2">No ball control stats recorded</div>
+              </div>
+            </div>
           </div>
-        </div>
-        
-        <!-- Detailed Stats Table -->
-        <div class="bg-white p-4 rounded-lg shadow-sm">
-          <h3 class="text-xl font-semibold mb-3">Recent Stats</h3>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Game</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stat Type</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="(stat, index) in playerStats.data.slice(0, 10)" :key="index" class="hover:bg-gray-50">
-                  <td class="px-4 py-2 whitespace-nowrap">{{ formatDate(stat.created_at) }}</td>
-                  <td class="px-4 py-2 whitespace-nowrap">{{ stat.gameName || 'Game ' + stat.gameId }}</td>
-                  <td class="px-4 py-2 whitespace-nowrap">{{ formatStatType(stat.statType) }}</td>
-                  <td class="px-4 py-2 whitespace-nowrap text-right font-medium">{{ stat.value }}</td>
-                </tr>
-              </tbody>
-            </table>
+          
+          <!-- Right Column - Match History and Game Impact -->
+          <div class="space-y-4">
+            <!-- Game Impact Card -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div class="bg-purple-100 px-4 py-2">
+                <h4 class="font-medium text-purple-800">Game Impact</h4>
+              </div>
+              <div class="p-4">
+                <div class="space-y-3">
+                  <div class="flex justify-between py-2 border-b border-gray-100">
+                    <span class="text-gray-700">Total Games Played</span>
+                    <span class="font-medium text-lg">{{ selectedPlayer.gamesPlayed || countUniqueGames() }}</span>
+                  </div>
+                  <div class="flex justify-between py-2 border-b border-gray-100">
+                    <span class="text-gray-700">Total Actions</span>
+                    <span class="font-medium text-lg">{{ playerStats.data.length }}</span>
+                  </div>
+                  <div class="flex justify-between py-2">
+                    <span class="text-gray-700">Avg. Actions Per Game</span>
+                    <span class="font-medium text-lg">{{ calculateAvgActionsPerGame() }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Match History Card -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div class="bg-indigo-100 px-4 py-2 flex justify-between items-center">
+                <h4 class="font-medium text-indigo-800">Recent Matches</h4>
+              </div>
+              <div class="p-4">
+                <div class="overflow-x-auto max-h-64">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Game</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <tr v-for="(stat, index) in playerStats.data.slice(0, 6)" :key="index" class="hover:bg-gray-50">
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{{ formatDate(stat.created_at || stat.createdAt) }}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{{ stat.gameName || 'Game ' + stat.gameId }}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                          <span :class="getStatColorClass(stat.statType)">
+                            {{ formatStatType(stat.statType) }}
+                          </span>
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right font-medium">{{ stat.value }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1115,24 +1278,40 @@ export default {
       playerStats.loading = true
       
       try {
-        // Fetch player stats from our new player stats API
-        const response = await axios.get(`/api/players/${player.id}/stats`)
+        // Fetch player stats from our player stats API
+        console.log(`Fetching stats for player ID: ${player.id}`)
+        const response = await axios.get(`/players/${player.id}/stats`)
         
-        if (response.data && response.data.data) {
-          playerStats.data = response.data.data || []
-          console.log('Player stats loaded:', playerStats.data)
+        if (response.data && Array.isArray(response.data.data)) {
+          // Direct array response
+          playerStats.data = response.data.data
+          console.log(`Player stats loaded: ${playerStats.data.length} records`)
+        } else if (response.data && response.data.data) {
+          // Object with data property containing array
+          playerStats.data = response.data.data
+          console.log(`Player stats loaded: ${playerStats.data.length} records`)
         } else {
-          console.warn('No player stats data found in response:', response)
+          console.warn('Unexpected response format:', response.data)
+          playerStats.data = []
+        }
+        
+        // If data is empty, make sure to explicitly set it as an empty array
+        if (!playerStats.data || !Array.isArray(playerStats.data)) {
           playerStats.data = []
         }
         
         // Setup chart in the next tick after the DOM is updated
         nextTick(() => {
-          setupStatsChart()
+          if (playerStats.data.length > 0) {
+            setupStatsChart()
+          } else {
+            console.log('No stats data available for chart')
+          }
         })
       } catch (error) {
         console.error('Error fetching player stats:', error)
         playerStats.error = 'Failed to load player statistics. Please try again.'
+        playerStats.data = []
       } finally {
         playerStats.loading = false
       }
@@ -1226,6 +1405,91 @@ export default {
     const formatStatType = (statType) => {
       if (!statType) return ''
       return statType.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    }
+
+    // Get appropriate color class for a stat type
+    const getStatTypeColor = (statType) => {
+      if (!statType) return 'text-gray-600'
+      
+      const type = statType.toUpperCase()
+      switch(type) {
+        case 'ATTACK':
+        case 'SERVE':
+          return 'text-red-600'
+        case 'BLOCK':
+        case 'DIG':
+          return 'text-blue-600'
+        case 'PASS':
+        case 'SET':
+          return 'text-green-600'
+        default:
+          return 'text-purple-600'
+      }
+    }
+    
+    // Get stats category based on stat type
+    const getStatCategory = (statType) => {
+      if (!statType) return 'Other'
+      
+      const type = statType.toUpperCase()
+      if (['ATTACK', 'SERVE'].includes(type)) {
+        return 'Offense'
+      } else if (['BLOCK', 'DIG'].includes(type)) {
+        return 'Defense'
+      } else if (['PASS', 'SET'].includes(type)) {
+        return 'Ball Control'
+      } else {
+        return 'Other'
+      }
+    }
+    
+    // Get stats filtered by category
+    const getStatsByCategory = (statType) => {
+      if (!playerStats.data) return []
+      return playerStats.data.filter(stat => stat.statType && stat.statType.toUpperCase() === statType.toUpperCase())
+    }
+    
+    // Count stats by type
+    const countStatsByType = (statType) => {
+      const stats = getStatsByCategory(statType)
+      return stats.reduce((total, stat) => total + (parseInt(stat.value) || 0), 0)
+    }
+    
+    // Get color class for stat type
+    const getStatColorClass = (statType) => {
+      if (!statType) return 'text-gray-600'
+      
+      const type = statType.toUpperCase()
+      if (['ATTACK', 'SERVE'].includes(type)) {
+        return 'text-red-600 font-medium'
+      } else if (['BLOCK', 'DIG'].includes(type)) {
+        return 'text-blue-600 font-medium'
+      } else if (['PASS', 'SET'].includes(type)) {
+        return 'text-green-600 font-medium'
+      } else {
+        return 'text-purple-600 font-medium'
+      }
+    }
+    
+    // Calculate unique games a player has participated in
+    const countUniqueGames = () => {
+      if (!playerStats.data || playerStats.data.length === 0) return 0
+      
+      const uniqueGameIds = new Set()
+      playerStats.data.forEach(stat => {
+        if (stat.gameId) {
+          uniqueGameIds.add(stat.gameId)
+        }
+      })
+      return uniqueGameIds.size
+    }
+    
+    // Calculate average actions per game
+    const calculateAvgActionsPerGame = () => {
+      const uniqueGames = countUniqueGames()
+      if (uniqueGames === 0) return 0
+      
+      return (playerStats.data.length / uniqueGames).toFixed(1)
     }
 
     // Format date for display
@@ -1347,6 +1611,36 @@ export default {
       return orderedStats
     })
 
+    // Calculate percentage of values (1, 2, 3) for a specific stat type - now renamed to calculateStatValuePercentage
+    const calculateStatValuePercentage = (statType, value) => {
+      const stats = getStatsByCategory(statType)
+      if (!stats || stats.length === 0) return 0
+      
+      const count = stats.filter(stat => parseInt(stat.value) === value).length
+      const percentage = (count / stats.length) * 100
+      return Math.round(percentage)
+    }
+    
+    // Get color class based on stat value label
+    const getStatValueColorClass = (label) => {
+      switch(label) {
+        case 'Point': return 'text-green-600'
+        case 'Good': return 'text-amber-500'
+        case 'Error': return 'text-red-600'
+        default: return 'text-gray-600'
+      }
+    }
+    
+    // Get bar color class based on stat value label
+    const getStatBarColorClass = (label) => {
+      switch(label) {
+        case 'Point': return 'bg-green-500'
+        case 'Good': return 'bg-amber-400'
+        case 'Error': return 'bg-red-500'
+        default: return 'bg-gray-400'
+      }
+    }
+
     return {
       teams,
       availablePlayers,
@@ -1393,7 +1687,7 @@ export default {
       savePlayerEdit,
       // Player deletion
       confirmDeletePlayer,
-      // New player stats functionality
+      // Player stats functionality
       showPlayerStats,
       selectedPlayer,
       selectedPlayerTeam,
@@ -1402,7 +1696,19 @@ export default {
       viewPlayerStats,
       closePlayerStats,
       formatStatType,
-      formatDate
+      formatDate,
+      // New player stats utility functions
+      getStatTypeColor,
+      getStatCategory,
+      getStatsByCategory,
+      countUniqueGames,
+      calculateAvgActionsPerGame,
+      // Additional UI helpers
+      countStatsByType,
+      getStatColorClass,
+      calculateStatValuePercentage,
+      getStatValueColorClass,
+      getStatBarColorClass
     }
   },
 }
@@ -1438,3 +1744,4 @@ input {
   font-size: 1.50rem; /* Adjust this value as needed */
 }
 </style>
+

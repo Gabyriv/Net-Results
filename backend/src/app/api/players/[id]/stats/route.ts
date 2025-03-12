@@ -10,7 +10,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const playerId = params.id;
+    // Ensure params is properly resolved before accessing id
+    const playerId = await Promise.resolve(params.id);
+    
     if (!playerId) {
       return NextResponse.json({ error: 'Player ID is required' }, { status: 400 });
     }
@@ -23,37 +25,49 @@ export async function GET(
     // Parse gameId to integer if provided
     const gameId = gameIdParam ? parseInt(gameIdParam, 10) : null;
     
-    // Get player stats using raw SQL to avoid Prisma type issues
+    // Get player stats using Prisma instead of raw SQL for better type safety
     let playerStats;
     
-    if (gameId && !isNaN(gameId)) {
-      // If gameId is provided, filter by both player and game
-      playerStats = await prisma.$queryRaw`
-        SELECT ps.*, g.game as "gameName", s.name as "statTypeName"
-        FROM "PlayerStat" ps
-        LEFT JOIN "Game" g ON ps."gameId" = g.id
-        LEFT JOIN "Stat" s ON ps."statId" = s.id
-        WHERE ps."playerId" = ${playerId}
-        AND ps."gameId" = ${gameId}
-        ORDER BY ps."created_at" DESC
-      `;
-    } else {
-      // Otherwise just filter by player
-      playerStats = await prisma.$queryRaw`
-        SELECT ps.*, g.game as "gameName", s.name as "statTypeName"
-        FROM "PlayerStat" ps
-        LEFT JOIN "Game" g ON ps."gameId" = g.id
-        LEFT JOIN "Stat" s ON ps."statId" = s.id
-        WHERE ps."playerId" = ${playerId}
-        ORDER BY ps."created_at" DESC
-      `;
+    try {
+      // Using Prisma's native query instead of raw SQL
+      playerStats = await prisma.playerStats.findMany({
+        where: {
+          playerId: playerId,
+          ...(gameId ? { gameId: gameId.toString() } : {})
+        },
+        include: {
+          Game: {
+            select: {
+              game: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+      
+      // Format the result to match expected output
+      const formattedStats = playerStats.map(stat => ({
+        ...stat,
+        gameName: stat.Game?.game || `Game ${stat.gameId}`
+      }));
+      
+      return NextResponse.json({ success: true, data: formattedStats });
+      
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      return NextResponse.json(
+        { error: 'Error querying player stats from database' },
+        { status: 500 }
+      );
     }
     
-    return NextResponse.json({ success: true, data: playerStats });
   } catch (error) {
-    console.error('Error fetching player stats:', error);
+    // Fix error handling by providing a proper error object
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Error fetching player stats' },
+      { error: 'Error fetching player stats', message: errorMessage },
       { status: 500 }
     );
   }

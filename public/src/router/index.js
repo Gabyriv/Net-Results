@@ -14,6 +14,7 @@ const FetchApi = () => import('../components/FetchApi.vue')
 const FetchData = () => import('../components/FetchData.vue')
 const VolleyballScoring = () => import('../pages/VolleyballScoring.vue')
 const GameStats = () => import('../pages/GameStats.vue')
+const PlayerStats = () => import('../pages/PlayerStats.vue')
 
 const routes = [
   { path: '/' , redirect: '/home' },
@@ -76,6 +77,13 @@ const routes = [
     path: '/games/:id/stats',
     name: 'GameStats',
     component: GameStats,
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/player/:id/stats',
+    name: 'PlayerStats',
+    component: PlayerStats,
     props: true,
     meta: { requiresAuth: true }
   },
