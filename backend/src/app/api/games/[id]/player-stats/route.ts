@@ -1,71 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, StatType } from '@prisma/client';
 
 // Create a single PrismaClient instance for the whole app
 const prisma = new PrismaClient();
 
-// Define the StatType enum to match what's in schema.prisma
-enum StatType {
-  SERVE = 'SERVE',
-  PASS = 'PASS',
-  SET = 'SET',
-  ATTACK = 'ATTACK',
-  BLOCK = 'BLOCK',
-  DIG = 'DIG'
-}
-
 // GET /api/games/[id]/player-stats
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const gameId = parseInt(params.id, 10);
-    if (isNaN(gameId)) {
-      return NextResponse.json({ error: 'Invalid game ID' }, { status: 400 });
-    }
+export async function GET(request: Request, context: { params: { id: string } }) {
+  const params = await Promise.resolve(context.params);
+  const gameId = params.id;
+  
+  if (!gameId) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid game ID' }, 
+      { status: 400 }
+    );
+  }
 
-    // Get player stats for the specified game using raw SQL query
-    const playerStats = await prisma.$queryRaw`
-      SELECT ps.*, p."displayName"
-      FROM "PlayerStat" ps
-      JOIN "Player" p ON ps."playerId" = p.id
-      WHERE ps."gameId" = ${gameId}
-    `;
+  try {
+    // Get player stats for the specified game using Prisma client
+    const playerStats = await prisma.playerStats.findMany({
+      where: {
+        gameId: gameId
+      },
+      include: {
+        Player: {
+          select: {
+            displayName: true
+          }
+        }
+      }
+    });
     
     return NextResponse.json({ success: true, data: playerStats });
   } catch (error) {
-    console.error('Error fetching player stats:', error);
-    return NextResponse.json(
-      { error: 'Error fetching player stats' },
-      { status: 500 }
-    );
+    // Safely log error without directly passing potentially null object
+    console.error('Error fetching player stats:', error ? error.toString() : 'Unknown error');
+    
+    // Create a safe error response object
+    const safeErrorObj = {
+      error: 'Error fetching player stats',
+      message: error instanceof Error ? error.message : String(error || 'Unknown error')
+    };
+    
+    // Return a safe error response
+    return NextResponse.json(safeErrorObj, { status: 500 });
   }
 }
 
 // POST /api/games/[id]/player-stats
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, context: { params: { id: string } }) {
+  const params = await Promise.resolve(context.params);
+  const gameId = params.id;
+  
+  if (!gameId) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid game ID' },
+      { status: 400 }
+    );
+  }
+
   try {
     // Parse request body
     const body = await request.json();
     const { playerId, statType, value } = body;
     
+    // Log the received data for debugging
+    console.log('Received player stat:', { playerId, statType, value, gameId });
+    
     // Input validation
     if (!playerId || !statType || value === undefined) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing required fields', received: { playerId, statType, value } }, 
+        { status: 400 }
+      );
     }
     
     // Validate stat type
     if (!Object.values(StatType).includes(statType as StatType)) {
-      return NextResponse.json({ error: 'Invalid stat type' }, { status: 400 });
-    }
-    
-    const gameId = parseInt(params.id, 10);
-    if (isNaN(gameId)) {
-      return NextResponse.json({ error: 'Invalid game ID' }, { status: 400 });
+      return NextResponse.json(
+        { 
+          error: 'Invalid stat type', 
+          received: statType, 
+          validTypes: Object.values(StatType)
+        }, 
+        { status: 400 }
+      );
     }
     
     // Check if game exists
@@ -74,7 +93,7 @@ export async function POST(
     });
     
     if (!game) {
-      return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Game not found', gameId }, { status: 404 });
     }
     
     // Check if player exists
@@ -83,156 +102,130 @@ export async function POST(
     });
     
     if (!player) {
-      return NextResponse.json({ error: 'Player not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Player not found', playerId }, { status: 404 });
+    }
+
+    // Get the player's team ID
+    const teamId = player.teamId;
+    
+    if (!teamId) {
+      return NextResponse.json({ error: 'Player is not assigned to a team', playerId }, { status: 400 });
     }
     
-    // Get or create stat ID for this type
-    const stat = await prisma.$queryRaw`
-      SELECT * FROM "Stat" WHERE name = ${statType} LIMIT 1
-    `;
-    
-    let statId;
-    
-    if (Array.isArray(stat) && stat.length > 0) {
-      statId = stat[0].id;
-    } else {
-      // Create new stat type if it doesn't exist
-      const newStatId = Date.now(); // Generate a unique ID
-      await prisma.$executeRaw`
-        INSERT INTO "Stat" (id, name) VALUES (${newStatId}, ${statType})
-      `;
-      statId = newStatId;
-    }
-    
-    // Get the current date for dayOfGame
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Check if the stat already exists
-    const existingStat = await prisma.$queryRaw`
-      SELECT * FROM "PlayerStat" 
-      WHERE "playerId" = ${playerId} 
-      AND "gameId" = ${gameId} 
-      AND "statId" = ${statId}
-      LIMIT 1
-    `;
-    
-    let result;
-    
-    if (Array.isArray(existingStat) && existingStat.length > 0) {
-      // Update existing stat
-      await prisma.$executeRaw`
-        UPDATE "PlayerStat"
-        SET value = ${value}
-        WHERE id = ${existingStat[0].id}
-      `;
-      
-      result = {
-        ...existingStat[0],
-        value
-      };
-    } else {
-      // Create new stat
+    try {
+      // Generate a unique ID for the stat
       const uuid = await prisma.$queryRaw`SELECT uuid_generate_v4()`;
-      const newId = Array.isArray(uuid) ? uuid[0].uuid_generate_v4 : undefined;
+      const newId = Array.isArray(uuid) && uuid.length > 0 && uuid[0].uuid_generate_v4 
+        ? uuid[0].uuid_generate_v4 
+        : null;
       
-      await prisma.$executeRaw`
-        INSERT INTO "PlayerStat" (
-          id, value, created_at, dayOfGame, playerId, statId, gameId, statType
-        ) VALUES (
-          ${newId || 'uuid_generate_v4()'},
-          ${value},
-          CURRENT_TIMESTAMP,
-          ${today},
-          ${playerId},
-          ${statId},
-          ${gameId},
-          ${statType}::text::"StatType"
-        )
-      `;
+      // If we couldn't generate UUID, return error
+      if (!newId) {
+        return NextResponse.json({ error: 'Failed to generate unique ID for player stat' }, { status: 500 });
+      }
       
-      result = {
-        id: newId,
-        value,
-        playerId,
-        statId,
-        gameId,
-        statType,
-        dayOfGame: today,
-        created_at: new Date()
-      };
+      // Create new PlayerStats record
+      const result = await prisma.playerStats.create({
+        data: {
+          id: newId,
+          playerId: playerId,
+          gameId: gameId,
+          teamId: teamId,
+          statType: statType as StatType,
+          value: Number(value),
+          quality: value.toString(), // Using value as quality since it's required
+          updatedAt: new Date()
+        }
+      });
+      
+      return NextResponse.json({ success: true, data: result });
+    } catch (dbError) {
+      console.error('Database operation error:', dbError ? dbError.toString() : 'Unknown error');
+      return NextResponse.json({ 
+        error: 'Database operation failed',
+        details: dbError instanceof Error ? dbError.message : String(dbError || 'Unknown error')
+      }, { status: 500 });
+    }
+  } catch (error) {
+    // Safely log error without directly passing potentially null object
+    console.error('Error submitting player stat:', error ? error.toString() : 'Unknown error');
+    
+    // Create a safe error response object with proper typing
+    const safeErrorObj: {
+      error: string;
+      message: string;
+      stack?: string;
+    } = {
+      error: 'Error submitting player stat',
+      message: error instanceof Error ? error.message : String(error || 'Unknown error')
+    };
+    
+    // Only include stack trace in development
+    if (process.env.NODE_ENV !== 'production' && error instanceof Error) {
+      safeErrorObj.stack = error.stack;
     }
     
-    return NextResponse.json({ success: true, data: result });
-  } catch (error) {
-    console.error('Error submitting player stat:', error);
-    return NextResponse.json(
-      { error: 'Error submitting player stat' },
-      { status: 500 }
-    );
+    // Safely handle the NextResponse.json call with proper parameters
+    return NextResponse.json(safeErrorObj, { status: 500 });
   }
 }
 
 // DELETE /api/games/[id]/player-stats
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, context: { params: { id: string } }) {
+  const params = await Promise.resolve(context.params);
+  const gameId = params.id;
+  
+  if (!gameId) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid game ID' },
+      { status: 400 }
+    );
+  }
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const playerId = searchParams.get('playerId');
-    const statType = searchParams.get('statType');
-    
-    // Input validation
-    if (!playerId || !statType) {
-      return NextResponse.json({ error: 'Missing required query parameters' }, { status: 400 });
+    const url = new URL(request.url);
+    const statType = url.searchParams.get('statType');
+    const playerId = url.searchParams.get('playerId');
+
+    if (!statType || !playerId) {
+      return NextResponse.json(
+        { error: 'Missing required parameters' },
+        { status: 400 }
+      );
     }
 
     // Validate stat type
     if (!Object.values(StatType).includes(statType as StatType)) {
-      return NextResponse.json({ error: 'Invalid stat type' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid stat type' },
+        { status: 400 }
+      );
     }
     
-    const gameId = parseInt(params.id, 10);
-    if (isNaN(gameId)) {
-      return NextResponse.json({ error: 'Invalid game ID' }, { status: 400 });
-    }
-    
-    // Get stat ID for this type
-    const stat = await prisma.$queryRaw`
-      SELECT * FROM "Stat" WHERE name = ${statType} LIMIT 1
-    `;
-    
-    if (!Array.isArray(stat) || stat.length === 0) {
-      return NextResponse.json({ error: 'Stat type not found' }, { status: 404 });
-    }
-    
-    const statId = stat[0].id;
-    
-    // Check if the stat exists
-    const existingStat = await prisma.$queryRaw`
-      SELECT * FROM "PlayerStat" 
-      WHERE "playerId" = ${playerId} 
-      AND "gameId" = ${gameId} 
-      AND "statId" = ${statId}
-      LIMIT 1
-    `;
-    
-    if (!Array.isArray(existingStat) || existingStat.length === 0) {
-      return NextResponse.json({ error: 'Stat not found' }, { status: 404 });
-    }
-    
-    // Delete the player stat
-    await prisma.$executeRaw`
-      DELETE FROM "PlayerStat"
-      WHERE id = ${existingStat[0].id}
-    `;
-    
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting player stat:', error);
+    // Delete player stats directly from PlayerStats table
+    await prisma.playerStats.deleteMany({
+      where: {
+        gameId,
+        playerId,
+        statType: statType as StatType
+      }
+    });
+
     return NextResponse.json(
-      { error: 'Error deleting player stat' },
-      { status: 500 }
+      { success: true },
+      { status: 200 }
     );
+  } catch (error) {
+    // Safely log error without directly passing potentially null object
+    console.error('Error deleting player stats:', error ? error.toString() : 'Unknown error');
+    
+    // Create a safe error response object with proper typing
+    const safeErrorObj = {
+      error: 'Error deleting player stats',
+      message: error instanceof Error ? error.message : String(error || 'Unknown error')
+    };
+    
+    // Return a safe error response
+    return NextResponse.json(safeErrorObj, { status: 500 });
   }
 } 

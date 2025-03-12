@@ -187,8 +187,13 @@ export async function withAuth<T>(
     
     const userId = session.user.id;
     const userEmail = session.user.email || '';
-    const userRole = session.user.user_metadata?.role || 'User';
-    const userMetadata = session.user.user_metadata || {};
+    const userMetadata = typeof session.user.user_metadata === 'object' && session.user.user_metadata !== null
+        ? session.user.user_metadata
+        : {};
+    const userRole = typeof userMetadata.role === 'string' && 
+        (userMetadata.role === 'Manager' || userMetadata.role === 'Player')
+        ? userMetadata.role
+        : 'Manager'; // Default to Manager since this is for teams
 
     // Execute the handler with the session information
     try {

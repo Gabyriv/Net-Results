@@ -27,18 +27,18 @@ export async function POST(request: Request) {
                 );
             }
             
+            // Remove these lines - don't manually generate IDs
             // Get the next available ID
-            const lastGame = await prismaClient.game.findFirst({
-                orderBy: {
-                    id: 'desc'
-                }
-            });
+            // const lastGame = await prismaClient.game.findFirst({
+            //     orderBy: {
+            //         id: 'desc'
+            //     }
+            // });
             
-            const nextId = lastGame ? lastGame.id + 1 : 1;
+            // const nextId = lastGame ? lastGame.id + 1 : 1;
             
             // Create game data object with userId
             const gameData = {
-                id: nextId,
                 game: validationResult.data.game,
                 myTeam: validationResult.data.myTeam,
                 myPts: validationResult.data.myPts || 0,

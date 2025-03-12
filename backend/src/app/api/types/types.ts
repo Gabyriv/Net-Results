@@ -6,6 +6,10 @@ import { z } from "zod";
 export const RoleEnum = z.enum(["Manager", "Player"]);
 export type Role = z.infer<typeof RoleEnum>;
 
+// Enum for StatType - Adding this to match implementation
+export const StatTypeEnum = z.enum(["SERVE", "PASS", "SET", "ATTACK", "BLOCK", "DIG"]);
+export type StatType = z.infer<typeof StatTypeEnum>;
+
 // User schemas
 export const UserSchema = z.object({
   id: z.string().optional(),
@@ -63,11 +67,18 @@ export const PlayerUpdateSchema = z.object({
 export const GameCreateSchema = z.object({
   game: z.string(),
   myTeam: z.string(),
-  myPts: z.number().int(),
+  myPts: z.number().int().default(0),
   oppTeam: z.string(),
-  oppPts: z.number().int(),
+  oppPts: z.number().int().default(0),
   sets: z.number().int(),
-  created_at: z.date().optional()
+  maxSets: z.number().int().default(3),
+  setScores: z.union([z.string(), z.record(z.any())]).optional(),
+  setsWon: z.union([z.string(), z.record(z.any())]).optional(),
+  isActive: z.boolean().optional().default(false),
+  currentSet: z.number().int().optional().default(0),
+  servingTeam: z.string().optional(),
+  notes: z.union([z.string(), z.record(z.any())]).optional(),
+  created_at: z.date().optional().default(new Date())
 });
 
 export const GameUpdateSchema = z.object({
@@ -77,7 +88,14 @@ export const GameUpdateSchema = z.object({
   oppTeam: z.string().optional(),
   oppPts: z.number().int().optional(),
   sets: z.number().int().optional(),
-  created_at: z.date().optional()
+  maxSets: z.number().int().optional(),
+  setScores: z.union([z.string(), z.record(z.any())]).optional(),
+  setsWon: z.union([z.string(), z.record(z.any())]).optional(),
+  isActive: z.boolean().optional(),
+  currentSet: z.number().int().optional(),
+  servingTeam: z.string().optional(),
+  notes: z.union([z.string(), z.record(z.any())]).optional(),
+  created_at: z.union([z.string(), z.date()]).optional()
 });
 
 // PlayerStat schemas
@@ -88,11 +106,14 @@ export const PlayerStatSchema = z.object({
   dayOfGame: z.string(),
   playerId: z.string(),
   statId: z.number().int(),
+  statType: StatTypeEnum.optional(),
+  gameId: z.string().optional(),
 });
 
 export const PlayerStatUpdateSchema = z.object({
   value: z.number().optional(),
   dayOfGame: z.string().optional(),
+  statType: StatTypeEnum.optional(),
 });
 
 // Stat schemas

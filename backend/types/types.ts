@@ -8,6 +8,10 @@ export type Role = z.infer<typeof RoleEnum>;
 export const ServingTeamEnum = z.enum(["Home", "Away"]);
 export type ServingTeam = z.infer<typeof ServingTeamEnum>;
 
+// Enum for StatType - Adding this to match implementation
+export const StatTypeEnum = z.enum(["SERVE", "PASS", "SET", "ATTACK", "BLOCK", "DIG"]);
+export type StatType = z.infer<typeof StatTypeEnum>;
+
 // User schemas
 export const UserSchema = z.object({
   id: z.string().optional(),
@@ -79,7 +83,8 @@ export const GameSchema = z.object({
   setsWon: z.union([z.string(), z.record(z.any())]).optional(),
   isActive: z.boolean().optional().default(false),
   currentSet: z.number().int().optional().default(0),
-  servingTeam: z.union([z.string(), ServingTeamEnum]).optional()
+  servingTeam: z.union([z.string(), ServingTeamEnum]).optional(),
+  notes: z.union([z.string(), z.record(z.any())]).optional()
 });
 
 export const GameUpdateSchema = z.object({
@@ -94,7 +99,9 @@ export const GameUpdateSchema = z.object({
   setsWon: z.union([z.string(), z.record(z.any())]).optional(),
   isActive: z.boolean().optional(),
   currentSet: z.number().int().optional(),
-  servingTeam: z.union([z.string(), ServingTeamEnum]).optional()
+  servingTeam: z.union([z.string(), ServingTeamEnum]).optional(),
+  notes: z.union([z.string(), z.record(z.any())]).optional(),
+  created_at: z.union([z.string(), z.date()]).optional()
 });
 
 // PlayerStat schemas
@@ -105,11 +112,14 @@ export const PlayerStatSchema = z.object({
   dayOfGame: z.string(),
   playerId: z.string(),
   statId: z.number().int(),
+  statType: StatTypeEnum.optional(),
+  gameId: z.string().optional(),
 });
 
 export const PlayerStatUpdateSchema = z.object({
   value: z.number().optional(),
   dayOfGame: z.string().optional(),
+  statType: StatTypeEnum.optional(),
 });
 
 // Stat schemas

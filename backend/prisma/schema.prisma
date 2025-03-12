@@ -15,9 +15,9 @@ model User {
   displayName String
   role        Role     @default(Player)
   managerId   String?  @unique
+  games       Game[]
   manager     Manager?
   player      Player?
-  games       Game[]
 }
 
 model Manager {
@@ -29,71 +29,67 @@ model Manager {
 }
 
 model Team {
-  id        String   @id @unique
-  name      String
-  managerId String
-  players   Player[]
-  manager   Manager  @relation(fields: [managerId], references: [id])
+  id          String        @id @unique
+  name        String
+  managerId   String
+  players     Player[]
+  PlayerStats PlayerStats[]
+  manager     Manager       @relation(fields: [managerId], references: [id])
 }
 
 model Player {
-  id          String       @id @unique
+  id          String        @id @default(cuid())
   displayName String
   gamesPlayed Int
   number      Int?
   teamId      String?
-  userId      String       @unique
-  team        Team?        @relation(fields: [teamId], references: [id])
-  user        User         @relation(fields: [userId], references: [id])
-  playerStats PlayerStat[]
+  userId      String        @unique
+  team        Team?         @relation(fields: [teamId], references: [id])
+  user        User          @relation(fields: [userId], references: [id])
+  PlayerStats PlayerStats[]
 }
 
 model Game {
-  id          Int          @id @unique
-  created_at  DateTime     @default(now())
+  id          String        @id @default(cuid())
+  created_at  DateTime      @default(now())
   game        String
   myTeam      String
   myPts       Int
   oppTeam     String
   oppPts      Int
   sets        Int
-  maxSets     Int          @default(3)
+  maxSets     Int           @default(3)
   setScores   Json?
   setsWon     Json?
-  isActive    Boolean      @default(false)
-  currentSet  Int          @default(0) @db.SmallInt
-  servingTeam ServingTeam? @default(Home)
+  isActive    Boolean       @default(false)
+  currentSet  Int           @default(0) @db.SmallInt
+  servingTeam ServingTeam?  @default(Home)
   userId      String
   season      String?
-  user        User         @relation(fields: [userId], references: [id])
-  playerStats PlayerStat[]
+  notes       Json?
+  user        User          @relation(fields: [userId], references: [id])
+  PlayerStats PlayerStats[]
 
   @@index([userId])
 }
 
-model PlayerStat {
-  id         String   @id @default(uuid())
-  value      Float
-  created_at DateTime @default(now())
-  dayOfGame  String
-  playerId   String
-  statId     Int
-  gameId     Int?
-  statType   StatType?
-  player     Player   @relation(fields: [playerId], references: [id])
-  stat       Stat     @relation(fields: [statId], references: [id])
-  game       Game?    @relation(fields: [gameId], references: [id])
+model PlayerStats {
+  id        String   @id
+  playerId  String
+  gameId    String
+  teamId    String
+  statType  StatType
+  value     Int
+  quality   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Game      Game     @relation(fields: [gameId], references: [id])
+  Player    Player   @relation(fields: [playerId], references: [id])
+  Team      Team     @relation(fields: [teamId], references: [id])
 
-  @@index([playerId])
-  @@index([statId])
   @@index([gameId])
-  @@index([statType])
-}
-
-model Stat {
-  id          Int          @id @unique
-  name        String       @unique
-  playerStats PlayerStat[]
+  @@index([playerId, createdAt(sort: Desc)])
+  @@index([teamId])
 }
 
 enum Role {

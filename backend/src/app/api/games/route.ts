@@ -8,9 +8,8 @@ import { GameSchema } from "../../../../types/types";
 // Type assertion to help TypeScript recognize the models
 const prismaClient = prisma as PrismaClient;
 
-
 export async function POST(request: Request) {
-    return withAuth(request, async (session) => {
+    return withAuth(request, async ({ userId }) => {
         try {
             const body = await request.json();
             
@@ -24,26 +23,17 @@ export async function POST(request: Request) {
                 );
             }
             
-            // Get the next available ID
-            const lastGame = await prismaClient.game.findFirst({
-                orderBy: {
-                    id: 'desc'
-                }
-            });
-            
-            const nextId = lastGame ? lastGame.id + 1 : 1;
-            
-            // Create the game with the validated data
+            // Create the game with the validated data - no need to generate ID manually
             const game = await prismaClient.game.create({
                 data: {
-                    id: nextId,
                     game: validationResult.data.game,
                     myTeam: validationResult.data.myTeam,
                     myPts: validationResult.data.myPts,
                     oppTeam: validationResult.data.oppTeam,
                     oppPts: validationResult.data.oppPts,
                     sets: validationResult.data.sets,
-                    created_at: validationResult.data.created_at || new Date()
+                    created_at: validationResult.data.created_at || new Date(),
+                    userId: userId // Add the userId from the session
                 }
             });
 
@@ -56,7 +46,6 @@ export async function POST(request: Request) {
         }
     });
 }
-
 
 export async function GET(request: Request) {
     return withAuth(request, async () => {
