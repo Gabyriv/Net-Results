@@ -3,8 +3,8 @@ import axios from 'axios'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://example.supabase.co'
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
-// Use environment variable if set, otherwise default to localhost
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+// Use environment variable if set, otherwise default to relative path
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 // Initialize Supabase client - only needed for realtime subscriptions
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
@@ -105,7 +105,7 @@ class RealtimeService {
     
     return retryRequest(async () => {
       try {
-        const url = `${API_URL}/games/${gameId}`;
+        const url = `/games/${gameId}`;
         console.log(`Sending PUT request to ${url} with data:`, JSON.stringify(gameData));
         
         const response = await axios.put(url, gameData, {
@@ -154,7 +154,7 @@ class RealtimeService {
     
     return retryRequest(async () => {
       try {
-        const url = `${API_URL}/games/${gameId}`;
+        const url = `/games/${gameId}`;
         console.log(`Sending GET request to ${url}`);
         
         const response = await axios.get(url, {
@@ -207,7 +207,7 @@ export const updateGameScore = async (gameId, gameData) => {
 
   while (retries <= MAX_RETRIES) {
     try {
-      const url = `${API_URL}/games/${gameId}`;
+      const url = `/games/${gameId}`;
       console.log(`Attempting to update game ${gameId} at ${url}`, gameData);
 
       const response = await fetch(url, {
@@ -260,7 +260,7 @@ export const getGameState = async (gameId) => {
 
   while (retries <= MAX_RETRIES) {
     try {
-      const url = `${API_URL}/games/${gameId}`;
+      const url = `/games/${gameId}`;
       console.log(`Fetching game state for ${gameId} from ${url}`);
       
       const response = await fetch(url, {

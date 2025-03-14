@@ -12,7 +12,7 @@ export const getTeamRoster = async (teamIdOrName) => {
 
   try {
     // Get the base URL from environment or use default
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    const baseUrl = import.meta.env.VITE_API_URL || '/api';
     
     // Get the auth token from localStorage
     const userStr = localStorage.getItem('user');

@@ -21,7 +21,7 @@ export function usePlayers() {
         throw new Error('Authentication required')
       }
 
-      const response = await axios.get(`${API_URL}/players`, {
+      const response = await axios.get(`/players`, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
@@ -47,7 +47,7 @@ export function usePlayers() {
         throw new Error('Authentication required')
       }
 
-      const response = await axios.get(`${API_URL}/teams`, {
+      const response = await axios.get(`/teams`, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
@@ -73,7 +73,7 @@ export function usePlayers() {
         throw new Error('Authentication required')
       }
 
-      const response = await axios.patch(`${API_URL}/players/${playerId}`, {
+      const response = await axios.patch(`/players/${playerId}`, {
         teamId: teamId
       }, {
         headers: {
@@ -109,7 +109,7 @@ export function usePlayers() {
         throw new Error('Authentication required')
       }
 
-      const response = await axios.patch(`${API_URL}/players/${playerId}`, {
+      const response = await axios.patch(`/players/${playerId}`, {
         teamId: null
       }, {
         headers: {
@@ -145,7 +145,7 @@ export function usePlayers() {
         throw new Error('Authentication required')
       }
 
-      const response = await axios.post(`${API_URL}/players`, playerData, {
+      const response = await axios.post(`/players`, playerData, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
@@ -178,7 +178,7 @@ export function usePlayers() {
 
       console.log(`Updating player ${playerId} with data:`, playerData)
 
-      const response = await axios.put(`${API_URL}/players/${playerId}`, playerData, {
+      const response = await axios.put(`/players/${playerId}`, playerData, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
@@ -223,7 +223,7 @@ export function usePlayers() {
 
       console.log(`Deleting player with ID: ${playerId}`)
 
-      const response = await axios.delete(`${API_URL}/players/${playerId}`, {
+      const response = await axios.delete(`/players/${playerId}`, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },

@@ -139,7 +139,7 @@ export default {
         const playerIds = team.value.players.map(p => p.id).join(',');
         
         // Fetch stats for all players in the team
-        const statsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/stats/players?playerIds=${playerIds}`);
+        const statsResponse = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/stats/players?playerIds=${playerIds}`);
         
         if (!statsResponse.ok) {
           // If the API doesn't support this endpoint, use a fallback

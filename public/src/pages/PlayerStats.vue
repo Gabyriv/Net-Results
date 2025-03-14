@@ -199,8 +199,8 @@ async function fetchPlayerData() {
     const playerResponse = await axios.get(`/api/players/${playerId.value}`)
     player.value = playerResponse.data.data
     
-    // Fetch player statistics
-    const statsResponse = await axios.get(`/api/players/${playerId.value}/statistics`)
+    // Fetch player statistics - using /stats endpoint instead of /statistics
+    const statsResponse = await axios.get(`/api/players/${playerId.value}/stats`)
     statistics.value = statsResponse.data.data
     
     // Extract unique seasons
@@ -226,8 +226,8 @@ async function filterStatsBySeason() {
   
   try {
     const url = selectedSeason.value 
-      ? `/api/players/${playerId.value}/statistics?season=${encodeURIComponent(selectedSeason.value)}`
-      : `/api/players/${playerId.value}/statistics`
+      ? `/api/players/${playerId.value}/stats?season=${encodeURIComponent(selectedSeason.value)}`
+      : `/api/players/${playerId.value}/stats`
       
     const response = await axios.get(url)
     statistics.value = response.data.data

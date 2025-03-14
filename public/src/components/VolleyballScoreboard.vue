@@ -759,10 +759,11 @@ export default {
         }
         
         // Construct the full API URL ensuring correct format
-        const baseApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        // Trim any trailing slashes
-        const baseUrl = baseApiUrl.endsWith('/') ? baseApiUrl.slice(0, -1) : baseApiUrl;
-        const fullApiUrl = `${baseUrl}/api/games/${game.value.id}/player-stats`;
+        const baseApiUrl = import.meta.env.VITE_API_URL || '/api';
+        // Only use baseApiUrl directly when it's the environment variable
+        const fullApiUrl = import.meta.env.VITE_API_URL 
+          ? `${baseApiUrl.endsWith('/') ? baseApiUrl.slice(0, -1) : baseApiUrl}/games/${game.value.id}/player-stats`
+          : `/api/games/${game.value.id}/player-stats`;
         
         // Debug the URL and data being sent
         console.log(`Sending player stat to: ${fullApiUrl}`);
@@ -1406,8 +1407,8 @@ export default {
           }
           
           // Construct the correct API URL
-          const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-          const url = `${apiBaseUrl}/api/games/${game.value.id}`;
+          const apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+          const url = `${apiBaseUrl}/games/${game.value.id}`;
           
           console.log('Sending PUT request to:', url);
           

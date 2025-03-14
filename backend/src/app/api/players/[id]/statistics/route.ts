@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
-import { prismaClient } from "../../../../../config/prisma-server";
-import { handleServerError } from "../../../errors_handlers/server-errors";
-import { withAuth } from "../../../../../utils/auth-utils";
-import { PlayerStatistics } from "@prisma/client";
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient, StatType } from '@prisma/client';
+import { withAuth } from '../../../../../utils/auth-utils';
+import { prismaClient } from '../../../../../config/prisma-server';
 
 // Define session type for consistency
 type SessionType = {
@@ -12,15 +11,22 @@ type SessionType = {
     userMetadata: Record<string, unknown>;
 };
 
-// Define statistics type
-interface DerivedStatistics extends PlayerStatistics {
-    derived: {
-        hittingPercentage: number;
-        servicePercentage: number;
-        blockEfficiency: number;
-        digEfficiency: number;
-        setEfficiency: number;
-        receiveEfficiency: number;
+// Interface for player stats
+interface PlayerStat {
+    id: string;
+    playerId: string;
+    gameId: string;
+    teamId: string;
+    statType: StatType;
+    value: number;
+    quality: string;
+    createdAt: Date;
+    updatedAt: Date;
+    Game?: {
+        id: string;
+        game: string;
+        created_at: Date;
+        season?: string | null;
     };
 }
 
@@ -29,13 +35,16 @@ interface DerivedStatistics extends PlayerStatistics {
  */
 export async function GET(
     request: Request, 
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     return withAuth(request, async (session: SessionType) => {
         try {
-            const playerId = params.id;
+            // First, ensure we have valid params object by awaiting it
+            const resolvedParams = await params;
+            const playerId = resolvedParams.id;
+            
             const { searchParams } = new URL(request.url);
-            const matchId = searchParams.get('matchId');
+            const gameId = searchParams.get('gameId');
             const season = searchParams.get('season');
 
             // Validate player exists
@@ -53,88 +62,63 @@ export async function GET(
             // Build query conditions
             const where: any = { playerId };
             
-            if (matchId) {
-                where.matchId = matchId;
+            if (gameId) {
+                where.gameId = gameId;
             }
             
+            // Note: This approach depends on how season is stored in your Game model
+            // Adjust as needed based on your schema
             if (season) {
-                where.match = {
+                where.Game = {
                     season
                 };
             }
 
-            // Get statistics
-            const statistics = await prismaClient.playerStatistics.findMany({
+            // Get statistics using the correct model name and fields
+            const statistics = await prismaClient.playerStats.findMany({
                 where,
                 include: {
-                    match: {
+                    Game: {
                         select: {
                             id: true,
-                            date: true,
-                            homeTeam: { select: { name: true } },
-                            awayTeam: { select: { name: true } },
-                            homeScore: true,
-                            awayScore: true,
+                            game: true,
+                            created_at: true,
                             season: true
                         }
                     }
                 },
-                orderBy: [
-                    { match: { date: 'desc' } }
-                ]
+                orderBy: {
+                    createdAt: 'desc'
+                }
             });
 
-            // Calculate derived statistics
-            const derivedStats: DerivedStatistics[] = statistics.map(stat => ({
-                ...stat,
-                derived: {
-                    hittingPercentage: calculateHittingPercentage(stat),
-                    servicePercentage: calculateServicePercentage(stat),
-                    blockEfficiency: calculateBlockEfficiency(stat),
-                    digEfficiency: calculateDigEfficiency(stat),
-                    setEfficiency: calculateSetEfficiency(stat),
-                    receiveEfficiency: calculateReceiveEfficiency(stat)
-                }
+            // Format stats for response
+            const formattedStats = statistics.map((stat: PlayerStat) => ({
+                id: stat.id,
+                playerId: stat.playerId,
+                gameId: stat.gameId,
+                statType: stat.statType,
+                value: stat.value,
+                quality: stat.quality,
+                gameName: stat.Game?.game || `Game ${stat.gameId}`,
+                date: stat.Game?.created_at || stat.createdAt,
+                season: stat.Game?.season || 'Unknown Season'
             }));
 
             return NextResponse.json({ 
                 success: true, 
-                data: derivedStats 
-            }, { status: 200 });
+                data: formattedStats 
+            });
         } catch (error) {
-            return handleServerError(error);
+            console.error('Error fetching player statistics:', error);
+            
+            return NextResponse.json(
+                { 
+                    error: 'Failed to fetch player statistics',
+                    message: error instanceof Error ? error.message : String(error)
+                },
+                { status: 500 }
+            );
         }
     });
-}
-
-// Utility functions for calculating derived statistics
-
-function calculateHittingPercentage(stats: PlayerStatistics) {
-    if (stats.totalAttacks === 0) return 0;
-    return ((stats.kills - stats.attackErrors) / stats.totalAttacks) * 100;
-}
-
-function calculateServicePercentage(stats: PlayerStatistics) {
-    if (stats.totalServes === 0) return 0;
-    return ((stats.totalServes - stats.serviceErrors) / stats.totalServes) * 100;
-}
-
-function calculateBlockEfficiency(stats: PlayerStatistics) {
-    if (stats.totalBlocks === 0) return 0;
-    return (stats.blockPoints / stats.totalBlocks) * 100;
-}
-
-function calculateDigEfficiency(stats: PlayerStatistics) {
-    if (stats.totalDigs === 0) return 0;
-    return (stats.digSuccess / stats.totalDigs) * 100;
-}
-
-function calculateSetEfficiency(stats: PlayerStatistics) {
-    if (stats.totalSets === 0) return 0;
-    return (stats.setSuccess / stats.totalSets) * 100;
-}
-
-function calculateReceiveEfficiency(stats: PlayerStatistics) {
-    if (stats.totalReceives === 0) return 0;
-    return (stats.receiveSuccess / stats.totalReceives) * 100;
 }

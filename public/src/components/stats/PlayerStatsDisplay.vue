@@ -124,11 +124,11 @@ export default {
     apiUrl() {
       // If gameId is provided, get stats for that specific game
       if (this.gameId) {
-        return `/api/games/${this.gameId}/player-stats?playerId=${this.playerId}`;
+        return `/games/${this.gameId}/player-stats?playerId=${this.playerId}`;
       }
       
       // Otherwise get aggregated stats (could be filtered by season)
-      let url = `/api/players/${this.playerId}/stats`;
+      let url = `/players/${this.playerId}/stats`;
       if (this.selectedSeason) {
         url += `?season=${encodeURIComponent(this.selectedSeason)}`;
       }

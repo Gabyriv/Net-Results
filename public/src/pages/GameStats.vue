@@ -374,7 +374,7 @@ export default {
       
       try {
         // Fetch game details
-        const gameResponse = await fetch(`/api/games/${this.gameId}`);
+        const gameResponse = await fetch(`/games/${this.gameId}`);
         if (!gameResponse.ok) {
           const errorData = await gameResponse.json();
           throw new Error(errorData.error || 'Failed to fetch game details');
@@ -437,7 +437,7 @@ export default {
       try {
         // Normally we'd fetch players associated with the teams in this game
         // For now, we'll just fetch all players as an example
-        const playersResponse = await fetch('/api/players');
+        const playersResponse = await fetch('/players');
         if (!playersResponse.ok) {
           const errorData = await playersResponse.json();
           console.error('Error fetching players:', errorData.error);
@@ -452,7 +452,7 @@ export default {
     },
     async fetchPlayerStats() {
       try {
-        const response = await fetch(`/api/games/${this.gameId}/player-stats`);
+        const response = await fetch(`/games/${this.gameId}/player-stats`);
         if (!response.ok) {
           const errorData = await response.json();
           console.error('Error fetching player stats:', errorData.error);
@@ -480,7 +480,7 @@ export default {
       
       try {
         const response = await fetch(
-          `/api/games/${this.gameId}/player-stats?playerId=${playerId}&statType=${statType}`, 
+          `/games/${this.gameId}/player-stats?playerId=${playerId}&statType=${statType}`, 
           { method: 'DELETE' }
         );
         

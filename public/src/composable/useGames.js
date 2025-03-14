@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import axios from 'axios'
 
-// API base URL - use the port detected from the backend server
-const API_URL = 'http://localhost:3000/api'
+// API base URL - use relative URL for Vite proxy
+const API_URL = '/api'
 
 export function useGames() {
   const games = ref([])
@@ -90,8 +90,8 @@ export function useGames() {
       // Use the provided data without additional transformation
       // The calling component should provide all fields in the correct format
       
-      // Use the unauthenticated endpoint for creating games
-      const response = await axios.post(`${API_URL}/games/create`, gameData)
+      // Use the authenticated endpoint for creating games
+      const response = await axios.post(`/games/create`, gameData)
       
       console.log('Create game response:', response.data);
       
@@ -163,7 +163,7 @@ export function useGames() {
     
     try {
       // Update to use the correct endpoint without /score
-      const response = await axios.put(`${API_URL}/games/${id}`, data)
+      const response = await axios.put(`/api/games/${id}`, data)
       
       if (response.data && response.data.success) {
         // Update the game in the games array
@@ -194,7 +194,7 @@ export function useGames() {
     error.value = null
     
     try {
-      const response = await axios.delete(`${API_URL}/games/${id}`)
+      const response = await axios.delete(`/api/games/${id}`)
       
       if (response.data && response.data.success) {
         // Remove the game from the games array

@@ -10,8 +10,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Ensure params is properly resolved before accessing id
-    const playerId = await Promise.resolve(params.id);
+    // First, ensure we have valid params object by awaiting it
+    const resolvedParams = await params;
+    const playerId = resolvedParams.id;
     
     if (!playerId) {
       return NextResponse.json({ error: 'Player ID is required' }, { status: 400 });

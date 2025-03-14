@@ -40,7 +40,7 @@ export const useMainStore = defineStore('main', {
       this.loading = true
       this.error = null
       try {
-        const response = await axios.get(`${API_URL}/players`)
+        const response = await axios.get(`/players`)
         this.players = response.data || []
         return this.players
       } catch (error) {
