@@ -1,8 +1,7 @@
 import { ref } from 'vue'
 import axios from 'axios'
 
-// API base URL - use relative URL for Vite proxy
-const API_URL = '/api'
+
 
 export function useGames() {
   const games = ref([])
@@ -163,7 +162,7 @@ export function useGames() {
     
     try {
       // Update to use the correct endpoint without /score
-      const response = await axios.put(`/api/games/${id}`, data)
+      const response = await axios.put(`/games/${id}`, data)
       
       if (response.data && response.data.success) {
         // Update the game in the games array
@@ -194,7 +193,7 @@ export function useGames() {
     error.value = null
     
     try {
-      const response = await axios.delete(`/api/games/${id}`)
+      const response = await axios.delete(`/games/${id}`)
       
       if (response.data && response.data.success) {
         // Remove the game from the games array

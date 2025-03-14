@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import axios from 'axios'
 
 export function useMatches() {
   const matches = ref([])
@@ -7,9 +8,8 @@ export function useMatches() {
   const fetchMatches = async () => {
     loading.value = true
     try {
-      // Replace with your API call
-      const response = await fetch('/api/matches')
-      matches.value = await response.json()
+      const response = await axios.get('/matches')
+      matches.value = response.data
     } catch (error) {
       console.error('Failed to fetch matches:', error)
     } finally {

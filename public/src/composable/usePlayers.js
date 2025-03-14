@@ -2,9 +2,6 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { useAuth } from './useAuth'
 
-// Use a consistent API URL
-const API_URL = '/api'
-
 export function usePlayers() {
   const players = ref([])
   const teams = ref([])
