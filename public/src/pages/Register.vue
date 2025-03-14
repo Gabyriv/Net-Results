@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-blue-200">
+  <div class="min-h-screen flex items-center justify-center bg-cover bg-center" style="background-image: url('../src/assets/wholecourt.jpeg');">
     <div class="max-w-lg w-full bg-white p-12 rounded-lg shadow-2xl">
       <h2 class="text-5xl font-bold mb-15 text-center">Register</h2>
       
