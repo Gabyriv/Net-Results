@@ -79,7 +79,7 @@ export default {
       this.errors.basic = null
       
       try {
-        const response = await axios.get('/api/route-connections')
+        const response = await axios.get('/route-connections')
         this.results.basic = `Message: ${response.data.message}, Status: ${response.data.status}, Time: ${response.data.timestamp}`
       } catch (error) {
         console.error('Connection test failed:', error)
@@ -99,7 +99,7 @@ export default {
           throw new Error('You need to log in first to test authentication')
         }
         
-        const response = await axios.get('/api/auth/validate', {
+        const response = await axios.get('/auth/validate', {
           headers: {
             'Authorization': `Bearer ${this.user.token}`
           }

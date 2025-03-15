@@ -13,6 +13,7 @@ export function useTeams() {
   const fetchTeams = async (options = {}) => {
     loading.value = true
     error.value = null
+    
     try {
       // Make sure we have a user and token
       if (!user.value?.token) {
@@ -34,12 +35,23 @@ export function useTeams() {
       
       const queryString = params.toString() ? `?${params.toString()}` : ''
       
-      const response = await axios.get(`/teams${queryString}`, {
+      // Set timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      )
+      
+      // Make the actual API call with proper headers
+      const fetchPromise = axios.get(`/teams${queryString}`, {
         headers: {
           'Authorization': `Bearer ${user.value.token}`
         },
         withCredentials: true
       })
+      
+      // Race between the fetch and the timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise])
+      
+      // Process response data
       teams.value = response.data.data || response.data
     } catch (err) {
       console.error('Error fetching teams:', err)

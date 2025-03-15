@@ -154,6 +154,7 @@
       <!-- Loading indicator -->
       <div v-if="loading && !games.length" class="flex justify-center items-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <p class="ml-4 text-blue-500">Loading matches...</p>
       </div>
 
       <!-- Data display -->
@@ -336,7 +337,6 @@ export default {
     const searchQuery = ref('')
     const showCreateForm = ref(false)
     const router = useRouter()
-    const isLoading = ref(false)
     
     // Team selection state
     const showMyTeamSuggestions = ref(false)
@@ -438,7 +438,7 @@ export default {
     
     // Initialize: fetch teams and games
     onMounted(async () => {
-      fetchGamesData()
+      await fetchGamesData();
       document.addEventListener('click', (e) => {
         const target = e.target
         if (!target.closest('.team-suggestions-container')) {
@@ -592,15 +592,17 @@ export default {
     
     // Fetch games from API
     const fetchGamesData = async () => {
-      isLoading.value = true
+      loading.value = true
       try {
         // Fetch only the user's games using the gameService
         const myGames = await gameService.getMyGames()
         games.value = myGames
+        console.log('Loading state:', loading.value);
+        console.log('Games:', games.value);
       } catch (error) {
         console.error('Error fetching games:', error)
       } finally {
-        isLoading.value = false
+        loading.value = false
       }
     }
     

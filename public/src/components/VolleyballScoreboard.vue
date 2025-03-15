@@ -1313,42 +1313,17 @@ export default {
             console.log(`Found ${unsavedStats.length} unsaved player stats to save`);
             
             // Track stats that failed to save
-            const failedStats = [];
             statsSaveAttempted = unsavedStats.length;
             
-            // Use a smaller batch size and introduce delay to avoid overwhelming the server
-            const batchSize = 3;
-            for (let i = 0; i < unsavedStats.length; i += batchSize) {
-              const batch = unsavedStats.slice(i, i + batchSize);
-              console.log(`Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(unsavedStats.length/batchSize)}`);
-              
+            if (unsavedStats.length > 0) {
               try {
-                const results = await Promise.allSettled(batch.map(async stat => {
-                  try {
-                    await savePlayerStat(stat);
-                    statsSaveSucceeded++;
-                    return { success: true, stat };
-                  } catch (saveError) {
-                    failedStats.push({stat, error: saveError.message});
-                    return { success: false, stat, error: saveError.message };
-                  }
-                }));
-                
-                console.log(`Batch results:`, results.map(r => r.status === 'fulfilled' ? r.value : r.reason));
+                // Save all player stats in a single batch for improved performance
+                await Promise.all(unsavedStats.map(stat => savePlayerStat(stat)));
+                statsSaveSucceeded = unsavedStats.length;
+                console.log(`Successfully saved all ${statsSaveSucceeded} player stats`);
               } catch (batchError) {
-                console.error('Error processing batch of player stats:', batchError);
+                console.error('Error saving player stats:', batchError);
               }
-              
-              // Small delay between batches to avoid rate limiting
-              if (i + batchSize < unsavedStats.length) {
-                console.log('Pausing between batches...');
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
-            }
-            
-            // Log all failed stats at once to make debugging easier
-            if (failedStats.length > 0) {
-              console.error(`Failed to save ${failedStats.length} player stats:`, failedStats);
             }
           }
         } catch (e) {
@@ -1440,9 +1415,9 @@ export default {
           
           gameUpdateSucceeded = true;
           
-          // Show success message with stats count
+          // Log success message instead of showing alert
           const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-          alert(`Game saved successfully in ${totalTime}s.\n${statsSaveSucceeded} of ${statsSaveAttempted} player stats saved.`);
+          console.log(`Game saved successfully in ${totalTime}s. ${statsSaveSucceeded} of ${statsSaveAttempted} player stats saved.`);
         } catch (error) {
           console.error('Error saving game:', error);
           throw error;
@@ -1450,11 +1425,11 @@ export default {
       } catch (error) {
         console.error('Failed to save game:', error);
         
-        // Show meaningful error message to the user
+        // Log error message instead of showing alert
         if (gameUpdateSucceeded) {
-          alert(`Game state was saved, but ${statsSaveAttempted - statsSaveSucceeded} of ${statsSaveAttempted} player stats failed to save. Your statistics may be incomplete.`);
+          console.warn(`Game state was saved, but ${statsSaveAttempted - statsSaveSucceeded} of ${statsSaveAttempted} player stats failed to save.`);
         } else {
-          alert('Failed to save game. Please try again or consider saving a backup of your data.');
+          console.error('Failed to save game. Please try again or consider saving a backup of your data.');
         }
       } finally {
         isSaving.value = false;

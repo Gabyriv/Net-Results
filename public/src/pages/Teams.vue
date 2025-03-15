@@ -332,9 +332,10 @@
           <span class="block sm:inline">{{ error.message }}</span>
         </div>
 
-        <!-- Skeleton Loading -->
-        <div v-if="loading && !initialLoadComplete" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div v-for="i in skeletonCount" :key="`skeleton-${i}`" class="bg-white p-6 rounded-lg shadow-lg animate-pulse">
+        <!-- Adjust the loading logic to ensure skeletons are hidden when data is available -->
+        <!-- Single consistent loading UI -->
+        <div v-if="loading && teams.length === 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div v-for="i in 3" :key="`skeleton-${i}`" class="bg-white p-6 rounded-lg shadow-lg animate-pulse">
             <div class="flex justify-between items-start">
               <div class="flex-grow">
                 <div class="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
@@ -353,17 +354,14 @@
           </div>
         </div>
 
-        <!-- Loading indicator for subsequent loads -->
-        <LoadingSpinner v-else-if="loading && initialLoadComplete" />
-
         <!-- No teams message -->
-        <div v-if="initialLoadComplete && !loading && teams.length === 0" class="bg-white p-6 rounded-lg shadow-lg mb-4">
+        <div v-if="!loading && teams.length === 0" class="bg-white p-6 rounded-lg shadow-lg mb-4">
           <p v-if="user?.role === 'Manager'" class="text-gray-700">You haven't created any teams yet. Create your first team to get started!</p>
           <p v-else class="text-gray-700">No teams found.</p>
         </div>
 
         <!-- Teams display -->
-        <div v-if="teams.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div v-if="teams.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
             v-for="team in visibleTeams"
             :key="team.id"
@@ -897,29 +895,23 @@
 </template>
 
 <script>
-import { onMounted, ref, computed, nextTick, defineAsyncComponent, reactive } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import axios from 'axios'
+import DefaultLayout from '../layouts/DefaultLayout.vue'
 import { useTeams } from '../composable/useTeams'
 import { useAuth } from '../composable/useAuth'
 import { usePlayers } from '../composable/usePlayers'
-import DefaultLayout from "../layouts/DefaultLayout.vue"
-import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
-import Chart from 'chart.js/auto'
-
-// Lazy load the LoadingSpinner component
-const LoadingSpinner = defineAsyncComponent(() =>
-  import("../components/LoadingSpinner.vue")
-)
 
 export default {
   name: "Teams",
-  components: { DefaultLayout, LoadingSpinner },
+  components: { DefaultLayout },
   setup() {
     const { teams, availablePlayers, error, loading, fetchTeams, fetchAvailablePlayers, createTeam, deleteTeam, updateTeam } = useTeams()
     const { user, initAuth } = useAuth()
-    const { updatePlayerById, deletePlayerById } = usePlayers()
-    const route = useRoute();
-    const router = useRouter();
+    const { players, getPlayer, updatePlayer, deletePlayerById } = usePlayers()
+    const router = useRouter()
+    const route = useRoute()
 
     const newTeam = ref({
       name: '',
@@ -934,8 +926,8 @@ export default {
     const showExistingPlayers = ref(false)
     const expandedTeams = ref([])
     const visibleTeamCount = ref(6) // Initial number of teams to show
-    const initialLoadComplete = ref(false)
-    const skeletonCount = ref(3) // Number of skeleton items to show during loading
+    const initialLoadComplete = ref(true) // Remove the need for separate initial load tracking
+    const skeletonCount = ref(3) // Keep this for reference but we'll use a simpler approach
     const showTeamDetails = ref(false)
     const selectedTeam = ref(null)
 
@@ -1512,60 +1504,55 @@ export default {
 
     // Initialize component with optimized loading sequence
     onMounted(async () => {
-      // Initialize auth first
-      await initAuth()
+      try {
+        // Initialize auth first
+        await initAuth()
+        
+        // Start fetching teams immediately - single fetch based on role
+        const fetchTeamsPromise = user.value?.role === 'Manager'
+          ? fetchTeams({ myTeams: true })
+          : fetchTeams()
 
-      // Use a smaller initial count for faster first render
-      visibleTeamCount.value = 3
+        // Shorter minimum loading time (100ms instead of 200ms)
+        const minLoadingTime = new Promise(resolve => setTimeout(resolve, 100))
 
-      // Start fetching teams immediately
-      const fetchTeamsPromise = user.value?.role === 'Manager'
-        ? fetchTeams({ myTeams: true })
-        : fetchTeams()
+        // Wait for both the minimum loading time and the data fetch
+        await Promise.all([fetchTeamsPromise, minLoadingTime])
 
-      // Set a timeout to show skeleton loading for at least 200ms instead of 300ms
-      // This prevents flickering for very fast loads but still feels fast
-      const minLoadingTime = new Promise(resolve => setTimeout(resolve, 200))
-
-      // Wait for both the minimum loading time and the data fetch
-      await Promise.all([fetchTeamsPromise, minLoadingTime])
-
-      // Mark initial load as complete
-      initialLoadComplete.value = true
-
-      // Increase visible count after initial render
-      setTimeout(() => {
+        // Set visible count immediately
         visibleTeamCount.value = 6
-      }, 100)
 
-      // Check if we need to show a specific team's details (from query parameter)
-      if (route.query.teamId) {
-        // Find the team by ID
-        const teamToShow = teams.value.find(team => team.id === route.query.teamId);
-        if (teamToShow) {
-          // Show the team details
-          nextTick(() => {
-            viewTeamDetails(teamToShow);
-          });
+        // Check if we need to show a specific team's details (from query parameter)
+        if (route.query.teamId) {
+          // Find the team by ID
+          const teamToShow = teams.value.find(team => team.id === route.query.teamId);
+          if (teamToShow) {
+            // Show the team details
+            nextTick(() => {
+              viewTeamDetails(teamToShow);
+            });
+          }
         }
-      }
 
-      // Show create form automatically if no teams exist (for managers)
-      if (user.value?.role === 'Manager') {
-        nextTick(() => {
-          if (teams.value.length === 0) {
-            showCreateForm.value = true
-          }
-        })
+        // Show create form automatically if no teams exist (for managers)
+        if (user.value?.role === 'Manager') {
+          nextTick(() => {
+            if (teams.value.length === 0) {
+              showCreateForm.value = true
+            }
+          })
 
-        // Prefetch available players in the background for managers
-        // This happens after the teams are loaded to prioritize the main content
-        // Increased delay to ensure teams render first
-        setTimeout(() => {
-          if (!loadingPlayers.value && availablePlayers.value.length === 0) {
-            loadAvailablePlayers()
-          }
-        }, 1500)
+          // Prefetch available players in the background for managers
+          // This happens after the teams are loaded to prioritize the main content
+          // Load players more efficiently instead of with a long delay
+          nextTick(() => {
+            if (!loadingPlayers.value && availablePlayers.value.length === 0) {
+              loadAvailablePlayers()
+            }
+          })
+        }
+      } catch (err) {
+        console.error('Error during initialization:', err)
       }
     })
 
@@ -1656,7 +1643,6 @@ export default {
       visibleTeams,
       visibleTeamCount,
       expandedTeams,
-      initialLoadComplete,
       skeletonCount,
       showTeamDetails,
       selectedTeam,

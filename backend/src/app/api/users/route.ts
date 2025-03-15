@@ -57,7 +57,7 @@ export async function POST(request: Request) {
         // First, create the user in Supabase Auth
         console.log('Creating user in Supabase Auth');
         // Create regular client for signup
-        const supabase = await createClient(null);
+        const supabase = await createClient(undefined);
         
         // Create admin client for email confirmation
         const adminClient = await createClient(undefined, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -277,7 +277,9 @@ export async function POST(request: Request) {
             
             return NextResponse.json({
               error: 'Failed to create user',
-              details: { message: authError.message }
+              details: { message: typeof authError === 'object' && authError !== null && 'message' in authError 
+                ? (authError as { message: string }).message 
+                : 'Unknown error' }
             }, { status: 500 });
           }
           

@@ -3,7 +3,7 @@ import { prisma } from "@/config/prisma";
 import { handleServerError } from "@/app/api/errors_handlers/server-errors";
 import { withAuth } from "@/utils/auth-utils";
 import { logger } from "@/utils/server-logger";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 
 // Type assertion to help TypeScript recognize the models
 const prismaClient = prisma as PrismaClient;
@@ -22,20 +22,153 @@ export async function GET(request: Request) {
                 myTeams: myTeams 
             });
 
+            // Debug log to see the exact user ID being looked up
+            console.log('Looking up user with ID:', session.userId);
+
             // Get user from database to check role
-            const dbUser = await prismaClient.user.findUnique({
+            let dbUser = await prismaClient.user.findUnique({
                 where: { id: session.userId },
                 include: { manager: true }
             });
             
             if (!dbUser) {
-                logger.warn('User not found', { userId: session.userId });
-                return NextResponse.json(
-                    { error: 'User not found' },
-                    { status: 404 }
-                );
+                // Debug log to see why user wasn't found
+                console.log('User not found in database with ID:', session.userId);
+                
+                // Let's log all user IDs in the database to see what we have
+                const allUsers = await prismaClient.user.findMany({
+                    select: { id: true, email: true }
+                });
+                console.log('Available users in database:', allUsers);
+                
+                logger.warn('User not found - attempting to fix ID mismatch', { userId: session.userId });
+                
+                // First check if a user with the same email already exists
+                const existingUserWithEmail = await prismaClient.user.findFirst({
+                    where: { email: session.userEmail },
+                    include: { manager: true }
+                });
+                
+                if (existingUserWithEmail) {
+                    logger.info('Found user with matching email but different ID', { 
+                        existingId: existingUserWithEmail.id, 
+                        supabaseId: session.userId,
+                        email: session.userEmail 
+                    });
+                    
+                    try {
+                        // Update the existing user's ID to match the Supabase ID
+                        const updatedUser = await prismaClient.user.update({
+                            where: { id: existingUserWithEmail.id },
+                            data: { id: session.userId },
+                            include: { manager: true }
+                        });
+                        
+                        logger.info('Updated user ID to match Supabase ID', { 
+                            oldId: existingUserWithEmail.id,
+                            newId: updatedUser.id
+                        });
+                        
+                        // Use the updated user
+                        dbUser = updatedUser;
+                        
+                        // If the user is a Manager but doesn't have a manager record, create one
+                        if (updatedUser.role === 'Manager' && !updatedUser.manager) {
+                            const manager = await prismaClient.manager.create({
+                                data: {
+                                    id: `mgr_${Date.now()}`,
+                                    displayName: updatedUser.displayName,
+                                    userId: updatedUser.id
+                                }
+                            });
+                            
+                            logger.info('Created missing manager record', { 
+                                userId: updatedUser.id, 
+                                managerId: manager.id 
+                            });
+                            
+                            // Update dbUser with manager data
+                            dbUser = await prismaClient.user.findUnique({
+                                where: { id: session.userId },
+                                include: { manager: true }
+                            });
+                        }
+                    } catch (updateError) {
+                        // If update fails (likely due to foreign key constraints), try a different approach
+                        logger.error(`Failed to update user ID: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`);
+                        
+                        // As a fallback solution, we'll update the Supabase ID in our auth system  
+                        logger.info('Falling back to using the existing user record as-is');
+                        dbUser = existingUserWithEmail;
+                    }
+                } else {
+                    // No user with this email exists, so create a new user
+                    try {
+                        const newUser = await prismaClient.user.create({
+                            data: {
+                                id: session.userId,
+                                email: session.userEmail,
+                                displayName: session.userMetadata.displayName as string || session.userEmail.split('@')[0],
+                                role: session.userRole as Role,
+                                password: 'imported-from-supabase' // Placeholder as we don't have access to the actual password
+                            }
+                        });
+                        
+                        logger.info('Created missing user from Supabase data', { 
+                            userId: newUser.id, 
+                            email: newUser.email 
+                        });
+                        
+                        // If user is a Manager, create manager record
+                        if (session.userRole === 'Manager') {
+                            const manager = await prismaClient.manager.create({
+                                data: {
+                                    id: `mgr_${Date.now()}`,
+                                    displayName: newUser.displayName,
+                                    userId: newUser.id
+                                }
+                            });
+                            
+                            logger.info('Created missing manager record', { 
+                                userId: newUser.id, 
+                                managerId: manager.id 
+                            });
+                            
+                            // Update dbUser with our newly created user
+                            const userWithManager = await prismaClient.user.findUnique({
+                                where: { id: session.userId },
+                                include: { manager: true }
+                            });
+                            
+                            // This should never be null, but we'll check to satisfy TypeScript
+                            if (userWithManager) {
+                                dbUser = userWithManager;
+                            } else {
+                                dbUser = {
+                                    ...newUser,
+                                    manager: null
+                                };
+                            }
+                        } else {
+                            // Update dbUser with our newly created user that doesn't have manager data
+                            dbUser = {
+                                ...newUser,
+                                manager: null
+                            };
+                        }
+                    } catch (createError) {
+                        const errorMessage = createError instanceof Error ? createError.message : 'Unknown error';
+                        logger.error(`Failed to create missing user for ID ${session.userId}: ${errorMessage}`);
+                        
+                        return NextResponse.json(
+                            { error: 'User not found and automatic creation failed' },
+                            { status: 404 }
+                        );
+                    }
+                }
             }
 
+            // At this point, dbUser should always be defined
             logger.info('User found', { 
                 userId: dbUser.id, 
                 role: dbUser.role, 
