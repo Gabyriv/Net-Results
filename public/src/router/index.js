@@ -15,24 +15,26 @@ const FetchData = () => import('../components/FetchData.vue')
 const VolleyballScoring = () => import('../pages/VolleyballScoring.vue')
 const GameStats = () => import('../pages/GameStats.vue')
 const PlayerStats = () => import('../pages/PlayerStats.vue')
+const LandingPage = () => import('../pages/Landingpage.vue')
 
 const routes = [
+  { path: '/', name: 'LandingPage', component: LandingPage },
   { path: '/' , redirect: '/home' },
-  { 
-    path: '/dashboard', 
-    name: 'Dashboard', 
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
     component: Dashboard,
     meta: { requiresAuth: true }
   },
-  { 
-    path: '/players', 
-    name: 'Players', 
+  {
+    path: '/players',
+    name: 'Players',
     component: Players,
     meta: { requiresAuth: true }
   },
-  { 
-    path: '/teams', 
-    name: 'Teams', 
+  {
+    path: '/teams',
+    name: 'Teams',
     component: Teams,
     meta: { requiresAuth: true }
   },
@@ -43,15 +45,15 @@ const routes = [
     props: true,
     meta: { requiresAuth: true }
   },
-  { 
-    path: '/matches', 
-    name: 'Matches', 
+  {
+    path: '/matches',
+    name: 'Matches',
     component: Matches,
     meta: { requiresAuth: true }
   },
-  { 
-    path: '/statistics', 
-    name: 'Statistics', 
+  {
+    path: '/statistics',
+    name: 'Statistics',
     component: Statistics,
     meta: { requiresAuth: true }
   },
@@ -122,34 +124,34 @@ router.beforeEach(async (to, from, next) => {
 
   // Check if the route requires authentication
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
-  
+
   if (!requiresAuth) {
     return next()
   }
-  
+
   // Get auth functions
   const { validateToken } = useAuth()
-  
+
   // Get user data from localStorage
   const userStr = localStorage.getItem('user')
   let isAuthenticated = false
   let userData = null
-  
+
   if (userStr) {
     try {
       userData = JSON.parse(userStr)
-      
+
       // Check if we have a valid cached result to avoid redundant validation
       const currentTime = Date.now()
       const cacheAge = currentTime - authCache.timestamp
-      
+
       // Use cached result if it's less than 30 seconds old and token matches
       if (authCache.token === userData.token && cacheAge < 30000) {
         isAuthenticated = authCache.isValid
       } else {
         // Validate token with backend
         isAuthenticated = await validateToken(userData.token)
-        
+
         // Update cache
         authCache.token = userData.token
         authCache.isValid = isAuthenticated
@@ -159,7 +161,7 @@ router.beforeEach(async (to, from, next) => {
       console.error('Error parsing user data from localStorage:', error)
     }
   }
-  
+
   if (!isAuthenticated) {
     // If route requires auth and user is not authenticated, redirect to login
     // Clear any stale user data and cookies
@@ -170,11 +172,11 @@ router.beforeEach(async (to, from, next) => {
       document.cookie = `${cookieName}=; path=/api; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`
     })
     // Redirect to login with the intended destination
-    next({ 
-      path: '/login', 
+    next({
+      path: '/login',
       query: to.path !== '/login' ? { redirect: to.fullPath } : undefined,
       // Use replace to avoid filling browser history with redirects
-      replace: true 
+      replace: true
     })
   } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated) {
     // If user is already authenticated and tries to access login/register, redirect to teams page
