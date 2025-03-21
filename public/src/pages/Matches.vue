@@ -294,6 +294,11 @@
           <div class="mb-6">
             <p class="text-gray-600">Are you sure you want to delete <span class="font-semibold">{{ selectedGame?.game }}</span>?</p>
             <p class="text-gray-600 mt-2">This action cannot be undone.</p>
+            
+            <!-- Error message display -->
+            <div v-if="error" class="mt-4 p-3 bg-red-100 text-red-700 rounded-lg">
+              {{ error }}
+            </div>
           </div>
           
           <div class="flex justify-end space-x-3">
@@ -615,17 +620,28 @@ export default {
       isDeleting.value = true
       
       try {
-        await deleteGame(selectedGame.value.id)
+        const result = await deleteGame(selectedGame.value.id)
         
-        // Close both modals
-        showDeleteConfirmation.value = false
-        showGameOverview.value = false
-        
-        // Refresh the games list
-        await fetchGamesData()
+        if (result) {
+          // Close both modals
+          showDeleteConfirmation.value = false
+          showGameOverview.value = false
+          
+          // Refresh the games list
+          await fetchGamesData()
+        } else {
+          // Display error within the modal
+          error.value = "Failed to delete the match. Please try again."
+        }
       } catch (err) {
         console.error('Error deleting game:', err)
-        error.value = `Failed to delete game: ${err.message || 'Unknown error'}`
+        // Set more descriptive error message for users
+        error.value = `Failed to delete match: ${err.response?.data?.error || err.message || 'Unknown error'}`
+        
+        // Keep the confirmation modal open when error occurs
+        setTimeout(() => {
+          error.value = null // Clear error after 5 seconds
+        }, 5000)
       } finally {
         isDeleting.value = false
       }

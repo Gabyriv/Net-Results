@@ -178,14 +178,29 @@ export async function DELETE(request: Request, context: { params: { id: string }
                 );
             }
 
-            // Delete the game
+            // First, delete associated player stats to avoid foreign key constraint errors
+            await prismaClient.playerStats.deleteMany({
+                where: { gameId: id }
+            });
+            
+            console.log(`Deleted all player stats for game ${id}`);
+
+            // Then delete the game
             const game = await prismaClient.game.delete({
                 where: { id }
             });
 
             return NextResponse.json({ success: true }, { status: 200 });
         } catch (error) {
-            return handleServerError(error);
+            console.error(`Error deleting game ${id}:`, error);
+            return NextResponse.json(
+                { 
+                    success: false, 
+                    error: "Database error", 
+                    details: error instanceof Error ? error.message : String(error)
+                }, 
+                { status: 400 }
+            );
         }
     });
 }

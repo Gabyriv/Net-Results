@@ -677,7 +677,120 @@ export default {
       closeStatModal();
     }
 
-    // New function to save player stat to the database
+    // New function to save multiple player stats in a single request
+    const savePlayerStatsBatch = async (stats) => {
+      try {
+        if (!stats || stats.length === 0) {
+          return { success: true, data: [] };
+        }
+        
+        // Make sure we have a game ID before trying to save
+        if (!game.value || !game.value.id) {
+          console.error('Cannot save player stats: No game ID available');
+          return { success: false, error: 'No game ID available' };
+        }
+        
+        // Map of frontend stat types to backend enum values
+        const statTypeMap = {
+          'Serve': 'SERVE',
+          'Pass': 'PASS',
+          'Set': 'SET',
+          'Attack': 'ATTACK',
+          'Block': 'BLOCK',
+          'Dig': 'DIG'
+        };
+        
+        // Transform stats to match API format
+        const batchStats = stats.map(stat => {
+          // Convert quality to numeric value
+          let value;
+          if (stat.quality === '+') value = 3; // Point
+          else if (stat.quality === '=') value = 2; // Good
+          else if (stat.quality === '-') value = 1; // Error
+          else value = 0; // Invalid/unknown
+          
+          // Create the base stat object with required fields
+          const statObject = {
+            playerId: stat.playerId,
+            statType: statTypeMap[stat.statType] || 'SERVE',
+            value: value,
+            gameId: game.value.id
+          };
+          
+          // Only include teamId if it exists and is valid
+          // This makes teamId completely optional
+          if (activeTeamId.value) {
+            statObject.teamId = activeTeamId.value;
+          }
+          
+          return statObject;
+        });
+        
+        // Get the auth token from localStorage
+        const userStr = localStorage.getItem('user');
+        let authToken = null;
+        
+        if (userStr) {
+          try {
+            const userData = JSON.parse(userStr);
+            if (userData && userData.token) {
+              authToken = userData.token;
+            }
+          } catch (e) {
+            console.error('Error parsing user data:', e);
+          }
+        }
+        
+        // Include the auth token in headers if available
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        // Create a custom endpoint for batch saving
+        const baseApiUrl = import.meta.env.VITE_API_URL || '/api';
+        const batchApiUrl = `${baseApiUrl}/games/${game.value.id}/player-stats/batch`;
+        
+        // Send the batch API request
+        const response = await fetch(batchApiUrl, {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ stats: batchStats })
+        });
+        
+        // Get the response as text first for better debugging
+        const responseText = await response.text();
+        
+        // Parse response
+        let responseJson;
+        try {
+          responseJson = JSON.parse(responseText);
+        } catch (e) {
+          console.warn('Could not parse response as JSON:', e);
+          return { success: false, error: 'Invalid response format' };
+        }
+        
+        // Return success/failure
+        if (response.ok) {
+          return { success: true, data: responseJson.data || [], count: responseJson.count || 0 };
+        } else {
+          return { 
+            success: false, 
+            error: responseJson?.error || `Server responded with ${response.status}`,
+            details: responseJson?.details
+          };
+        }
+      } catch (error) {
+        console.error('Error saving player stats batch:', error);
+        return { success: false, error: error.message || 'Unknown error' };
+      }
+    }
+
+    // Keep the original savePlayerStat for individual stat saving
     const savePlayerStat = async (stat) => {
       try {
         // Skip if no player ID
@@ -1317,12 +1430,18 @@ export default {
             
             if (unsavedStats.length > 0) {
               try {
-                // Save all player stats in a single batch for improved performance
-                await Promise.all(unsavedStats.map(stat => savePlayerStat(stat)));
-                statsSaveSucceeded = unsavedStats.length;
-                console.log(`Successfully saved all ${statsSaveSucceeded} player stats`);
+                // Save all player stats in a batch instead of individually
+                const result = await savePlayerStatsBatch(unsavedStats);
+                if (result.success) {
+                  // Mark all stats as saved
+                  unsavedStats.forEach(stat => stat.saved = true);
+                  statsSaveSucceeded = unsavedStats.length;
+                  console.log(`Successfully saved all ${statsSaveSucceeded} player stats in batch`);
+                } else {
+                  console.error('Error saving player stats batch:', result.error);
+                }
               } catch (batchError) {
-                console.error('Error saving player stats:', batchError);
+                console.error('Error saving player stats batch:', batchError);
               }
             }
           }
